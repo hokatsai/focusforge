@@ -599,11 +599,11 @@ export default function Home() {
           </div>
 
           {/* Core Knowledge Summary */}
-          {learningGuide.coreKnowledge?.length > 0 && (
+          {(learningGuide.coreKnowledge?.length ?? 0) > 0 && (
             <div className="mb-6">
               <h3 className="text-xl font-bold mb-4">📖 核心知识点</h3>
               <div className="grid gap-3">
-                {learningGuide.coreKnowledge.map((k) => (
+                {(learningGuide.coreKnowledge || []).map((k) => (
                   <details key={k.id} className="bg-slate-800/50 rounded-xl group">
                     <summary className="p-4 cursor-pointer list-none flex items-center justify-between">
                       <span className="font-medium flex items-center gap-2">
@@ -619,11 +619,11 @@ export default function Home() {
             </div>
           )}
 
-          {learningGuide.studyTips?.length > 0 && (
+          {(learningGuide.studyTips?.length ?? 0) > 0 && (
             <div className="bg-purple-500/10 rounded-xl p-4 border border-purple-500/30">
               <h3 className="font-bold mb-2">💡 学习建议</h3>
               <ul className="space-y-1">
-                {learningGuide.studyTips.map((tip, i) => <li key={i} className="text-slate-300 text-sm">• {tip}</li>)}
+                {(learningGuide.studyTips || []).map((tip, i) => <li key={i} className="text-slate-300 text-sm">• {tip}</li>)}
               </ul>
             </div>
           )}
