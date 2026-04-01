@@ -265,21 +265,65 @@ export default function Home() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/search', {
+      // Try new explore API first (MiniMax with web search)
+      let res = await fetch('/api/explore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: topicInput })
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
       
-      const guide = data.learningGuide || data;
+      let data = await res.json();
+      
+      // If explore fails or returns error, fallback to search API
+      if (data.error) {
+        res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: topicInput })
+        });
+        data = await res.json();
+        if (data.error) throw new Error(data.error);
+      }
+      
+      // Convert the new learning_map format to the old resources format
+      const guide: any = {
+        topic: data.topic || topicInput,
+        title: data.topic ? `${data.topic} 學習資源` : `${topicInput} 學習資源`,
+        overview: `為您搜索到與「${topicInput}」相關的學習資源`,
+        resources: {
+          textbooks: data.learning_map?.textbooks?.map((t: any) => ({
+            title: t.title,
+            description: t.summary,
+            url: t.url,
+            source: '教材'
+          })) || [],
+          pastPapers: data.learning_map?.exams?.map((e: any) => ({
+            title: e.title,
+            description: e.summary,
+            url: e.url,
+            source: '真題'
+          })) || [],
+          onlineCourses: data.learning_map?.courses?.map((c: any) => ({
+            title: c.title,
+            description: c.platform || '在線課程',
+            url: c.url,
+            platform: c.platform || '網絡'
+          })) || [],
+          studyNotes: data.learning_map?.notes?.map((n: any) => ({
+            title: n.title,
+            description: n.author || '網絡筆記',
+            url: n.url,
+            author: n.author
+          })) || []
+        }
+      };
+      
       setLearningGuide(guide);
       setStep('report');
       
       const book: Book = {
         id: Date.now().toString(),
-        name: guide.title || topicInput,
+        name: guide.title,
         topic: topicInput,
         createdAt: new Date().toISOString(),
         progress: 0,
