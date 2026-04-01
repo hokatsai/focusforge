@@ -495,29 +495,29 @@ export default function Home() {
   // Topic Search View
   if (view === 'topic') {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4">
+      <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-2xl mx-auto">
-          <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-6">
+          <button onClick={() => setView('home')} className="text-gray-400 hover:text-gray-600 mb-6">
             ← 返回
           </button>
           <div className="text-center mb-8">
             <div className="text-5xl mb-3">🔍</div>
             <h1 className="text-2xl font-bold mb-2">智能搜索學習</h1>
-            <p className="text-slate-400">輸入主題，AI 自動搜集資料、教材、網課</p>
+            <p className="text-gray-400">輸入主題，AI 自動搜集資料、教材、網課</p>
           </div>
-          <div className="bg-slate-800/50 rounded-xl p-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <textarea
               value={topicInput}
               onChange={e => setTopicInput(e.target.value)}
               placeholder="例如：系統集成項目管理工程師軟考"
-              className="w-full h-32 p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none mb-4"
+              className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 resize-none mb-4"
             />
             <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-500">提供主題名稱或考試名稱</span>
+              <span className="text-sm text-gray-400">提供主題名稱或考試名稱</span>
               <button
                 onClick={searchByTopic}
                 disabled={!topicInput.trim() || loading}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium disabled:opacity-50"
+                className="px-6 py-3 bg-gray-900 rounded-xl font-medium disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -528,7 +528,7 @@ export default function Home() {
               </button>
             </div>
             {error && (
-              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
                 {error}
               </div>
             )}
@@ -541,18 +541,18 @@ export default function Home() {
   // Learning/PDF View
   if (view === 'learning') {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4">
+      <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-2xl mx-auto">
-          <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-6">
+          <button onClick={() => setView('home')} className="text-gray-400 hover:text-gray-600 mb-6">
             ← 返回
           </button>
-          <div className="bg-slate-800/50 rounded-xl p-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div
               onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDragOver={e => e.preventDefault()}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-8 text-center transition ${isDragging ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-600'}`}
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition ${isDragging ? 'border-cyan-500 bg-gray-100' : 'border-gray-300'}`}
             >
               <input ref={fileRef} type="file" accept=".pdf" onChange={e => {
                 const f = e.target.files?.[0];
@@ -570,37 +570,37 @@ export default function Home() {
               }} className="hidden" id="pdf" />
               <label htmlFor="pdf" className="cursor-pointer">
                 {extracting ? (
-                  <div className="text-cyan-400">⚡ 提取中...</div>
+                  <div className="text-gray-600">⚡ 提取中...</div>
                 ) : selectedFile ? (
                   <div>
                     <div className="text-3xl mb-2">✅</div>
-                    <div className="text-cyan-400">{selectedFile.name}</div>
-                    <div className="text-slate-400 text-sm">點擊更換</div>
+                    <div className="text-gray-600">{selectedFile.name}</div>
+                    <div className="text-gray-400 text-sm">點擊更換</div>
                   </div>
                 ) : (
                   <div>
                     <div className="text-4xl mb-2">{isDragging ? '📥' : '📎'}</div>
-                    <div className="text-slate-300">{isDragging ? '鬆開上傳' : '點擊或拖拽 PDF'}</div>
+                    <div className="text-gray-600">{isDragging ? '鬆開上傳' : '點擊或拖拽 PDF'}</div>
                   </div>
                 )}
               </label>
             </div>
             
             {extractedText && (
-              <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
-                <p className="text-xs text-slate-500 mb-1">預覽（{extractedText.length.toLocaleString()} 字）</p>
-                <p className="text-sm text-slate-400 line-clamp-3">{extractedText.slice(0, 300)}...</p>
+              <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">預覽（{extractedText.length.toLocaleString()} 字）</p>
+                <p className="text-sm text-gray-400 line-clamp-3">{extractedText.slice(0, 300)}...</p>
               </div>
             )}
 
             <div className="flex justify-between items-center mt-4">
-              <span className="text-sm text-slate-500">
+              <span className="text-sm text-gray-400">
                 {selectedFile ? `已加載 ${(extractedText.length / 1024).toFixed(0)}K 字` : '或粘貼文本'}
               </span>
               <button
                 onClick={generateFromPdf}
                 disabled={!extractedText || loading}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium disabled:opacity-50"
+                className="px-6 py-3 bg-gray-900 rounded-xl font-medium disabled:opacity-50"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -611,18 +611,18 @@ export default function Home() {
               </button>
             </div>
             {error && (
-              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
                 {error}
               </div>
             )}
             
             {/* Also show textarea for text input */}
-            <div className="mt-4 pt-4 border-t border-slate-700">
+            <div className="mt-4 pt-4 border-t border-gray-200">
               <textarea
                 value={extractedText}
                 onChange={e => { setExtractedText(e.target.value); setSelectedFile(null); }}
                 placeholder="或者直接粘貼學習內容..."
-                className="w-full h-24 p-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none text-sm"
+                className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 resize-none text-sm"
               />
             </div>
           </div>
@@ -634,11 +634,11 @@ export default function Home() {
   // Bookshelf View
   if (view === 'bookshelf') {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4">
+      <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-1">
+              <button onClick={() => setView('home')} className="text-gray-400 hover:text-gray-600 mb-1">
                 ← 返回
               </button>
               <h1 className="text-2xl font-bold">📖 我的書架</h1>
@@ -649,15 +649,15 @@ export default function Home() {
           </div>
 
           {books.length === 0 ? (
-            <div className="bg-slate-800/50 rounded-xl p-8 text-center">
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
               <div className="text-5xl mb-3">📚</div>
               <h2 className="text-xl font-bold mb-2">書架是空的</h2>
-              <p className="text-slate-400 mb-4">開始搜索主題或上傳 PDF 來學習</p>
+              <p className="text-gray-400 mb-4">開始搜索主題或上傳 PDF 來學習</p>
               <div className="flex gap-3 justify-center">
-                <button onClick={() => setView('topic')} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl">
+                <button onClick={() => setView('topic')} className="px-6 py-3 bg-gray-900 rounded-xl">
                   🔍 智能搜索
                 </button>
-                <button onClick={() => setView('learning')} className="px-6 py-3 bg-slate-700 rounded-xl">
+                <button onClick={() => setView('learning')} className="px-6 py-3 bg-gray-100 rounded-xl">
                   📄 PDF 學習
                 </button>
               </div>
@@ -665,21 +665,21 @@ export default function Home() {
           ) : (
             <div className="space-y-3">
               {books.map(book => (
-                <div key={book.id} className="bg-slate-800/50 rounded-xl p-4 flex items-center gap-4">
+                <div key={book.id} className="bg-white rounded-xl p-4 flex items-center gap-4 shadow-sm border border-gray-100">
                   <div className="text-3xl">📕</div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold truncate">{book.name}</h3>
-                    <p className="text-slate-400 text-sm">{book.topic || 'PDF學習'}</p>
+                    <p className="text-gray-400 text-sm">{book.topic || 'PDF學習'}</p>
                     <div className="mt-2">
-                      <div className="h-1.5 bg-slate-700 rounded-full">
-                        <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${book.progress}%` }} />
+                      <div className="h-1.5 bg-gray-200 rounded-full">
+                        <div className="h-full bg-gray-900 rounded-full" style={{ width: `${book.progress}%` }} />
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">{book.progress}% 完成</p>
+                      <p className="text-xs text-gray-400 mt-1">{book.progress}% 完成</p>
                     </div>
                   </div>
                   <button
                     onClick={() => { if (book.learningGuide) { setLearningGuide(book.learningGuide); setStep('report'); } else setView('topic'); }}
-                    className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg"
+                    className="px-4 py-2 bg-cyan-500/20 text-gray-600 rounded-lg"
                   >
                     查看
                   </button>
@@ -695,44 +695,44 @@ export default function Home() {
   // Report View
   if (step === 'report' && learningGuide) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4">
+      <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-3xl mx-auto">
-          <button onClick={() => { setStep('input'); setLearningGuide(null); }} className="text-slate-400 hover:text-white mb-4">
+          <button onClick={() => { setStep('input'); setLearningGuide(null); }} className="text-gray-400 hover:text-gray-600 mb-4">
             ← 新搜索
           </button>
 
-          <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-6 border border-cyan-500/30 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
             <h1 className="text-2xl font-bold mb-2">📚 {learningGuide.title}</h1>
-            <p className="text-slate-300">{learningGuide.overview}</p>
+            <p className="text-gray-600">{learningGuide.overview}</p>
           </div>
 
           {/* Resources */}
           {learningGuide.resources && (
             <div className="space-y-4 mb-6">
               {learningGuide.resources.textbooks?.length ? (
-                <div className="bg-slate-800/50 rounded-xl p-4">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                   <h3 className="font-bold mb-3">📖 官方教材</h3>
                   <div className="space-y-2">
                     {learningGuide.resources.textbooks.map((r, i) => (
-                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700">
-                        <div className="text-cyan-400 font-medium">{r.title}</div>
-                        <div className="text-sm text-slate-400">{r.description}</div>
+                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-gray-100 rounded-lg hover:bg-gray-200">
+                        <div className="text-gray-600 font-medium">{r.title}</div>
+                        <div className="text-sm text-gray-400">{r.description}</div>
                       </a>
                     ))}
                   </div>
                 </div>
               ) : null}
               {learningGuide.resources.onlineCourses?.length ? (
-                <div className="bg-slate-800/50 rounded-xl p-4">
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                   <h3 className="font-bold mb-3">🎬 優質網課</h3>
                   <div className="space-y-2">
                     {learningGuide.resources.onlineCourses.map((r, i) => (
-                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700">
+                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-gray-100 rounded-lg hover:bg-gray-200">
                         <div className="flex justify-between">
                           <span className="text-green-400 font-medium">{r.title}</span>
                           {r.platform && <span className="text-xs bg-green-500/30 px-2 py-0.5 rounded">{r.platform}</span>}
                         </div>
-                        {r.instructor && <div className="text-sm text-slate-400">講師：{r.instructor}</div>}
+                        {r.instructor && <div className="text-sm text-gray-400">講師：{r.instructor}</div>}
                       </a>
                     ))}
                   </div>
@@ -742,16 +742,16 @@ export default function Home() {
           )}
 
           {/* Chapters */}
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
             <h3 className="font-bold mb-3">🗺️ 知識框架</h3>
             <div className="space-y-2">
               {learningGuide.chapters.map((ch, i) => (
-                <div key={ch.id} className="p-3 bg-slate-700/50 rounded-lg">
+                <div key={ch.id} className="p-3 bg-gray-100 rounded-lg">
                   <h4 className="font-medium">{i + 1}. {ch.chapter}</h4>
-                  <p className="text-sm text-slate-400">{ch.summary}</p>
+                  <p className="text-sm text-gray-400">{ch.summary}</p>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {ch.keyPoints.map((kp, j) => (
-                      <span key={j} className="text-xs px-2 py-1 bg-slate-600 rounded">{kp}</span>
+                      <span key={j} className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded">{kp}</span>
                     ))}
                   </div>
                 </div>
@@ -761,13 +761,13 @@ export default function Home() {
 
           {/* Study Plan */}
           {learningGuide.studyPlan?.stages?.length ? (
-            <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
               <h3 className="font-bold mb-3">📅 學習計劃</h3>
-              {learningGuide.studyPlan.duration && <p className="text-cyan-400 text-sm mb-2">{learningGuide.studyPlan.duration}</p>}
+              {learningGuide.studyPlan.duration && <p className="text-gray-600 text-sm mb-2">{learningGuide.studyPlan.duration}</p>}
               {learningGuide.studyPlan.stages.map((s, i) => (
-                <div key={i} className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                <div key={i} className="p-3 bg-gray-100 rounded-lg mb-2">
                   <div className="text-purple-400 font-medium">{s.stage}</div>
-                  <div className="text-sm text-slate-400">目標：{s.goal}</div>
+                  <div className="text-sm text-gray-400">目標：{s.goal}</div>
                 </div>
               ))}
             </div>
@@ -779,7 +779,7 @@ export default function Home() {
               <h3 className="font-bold mb-2">💡 學習建議</h3>
               <ul className="space-y-1">
                 {learningGuide.studyTips.map((t, i) => (
-                  <li key={i} className="text-sm text-slate-300">• {t}</li>
+                  <li key={i} className="text-sm text-gray-600">• {t}</li>
                 ))}
               </ul>
             </div>
