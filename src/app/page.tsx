@@ -9,47 +9,27 @@ type Step = 'input' | 'generating' | 'report';
 interface Chapter {
   id: string;
   chapter: string;
-  sections?: string[];
   summary: string;
   keyPoints: string[];
   importance: 'high' | 'medium' | 'low';
 }
 
-interface Resource {
-  title: string;
-  description: string;
-  url?: string;
-  year?: string;
-  platform?: string;
-  instructor?: string;
-  author?: string;
-}
-
 interface Resources {
-  textbooks?: Resource[];
-  pastPapers?: Resource[];
-  onlineCourses?: Resource[];
-  studyNotes?: Resource[];
-}
-
-interface StudyStage {
-  stage: string;
-  goal: string;
-  resources?: string[];
-  tasks?: string[];
+  textbooks?: { title: string; description: string; url?: string }[];
+  pastPapers?: { title: string; description: string; url?: string; year?: string }[];
+  onlineCourses?: { title: string; platform?: string; instructor?: string; description: string; url?: string }[];
+  studyNotes?: { title: string; author?: string; description: string; url?: string }[];
 }
 
 interface StudyPlan {
   duration?: string;
-  dailyTime?: string;
-  stages?: StudyStage[];
+  stages?: { stage: string; goal: string; resources?: string[]; tasks?: string[] }[];
 }
 
 interface LearningGuide {
   title: string;
   topic?: string;
   overview: string;
-  tableOfContents?: { chapter: string; sections: string[] }[];
   chapters: Chapter[];
   studyTips?: string[];
   resources?: Resources;
@@ -60,12 +40,21 @@ interface Book {
   id: string;
   name: string;
   topic?: string;
-  content?: string;
   createdAt: string;
-  lastLearnedAt?: string;
   progress: number;
-  completedChapters: string[];
   learningGuide?: LearningGuide;
+}
+
+interface QuizAnswer {
+  questionId: string;
+  selected: number;
+  correct: boolean;
+}
+
+interface QuizFeedback {
+  correct: boolean;
+  explanation: string;
+  hint: string;
 }
 
 declare global {
@@ -79,260 +68,389 @@ async function extractTextFromPDF(file: File): Promise<string> {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     document.head.appendChild(script);
-    await new Promise<void>((resolve) => {
-      script.onload = () => resolve();
-    });
+    await new Promise<void>((r) => { script.onload = r; });
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
-
-  const loadingTask = window.pdfjsLib.getDocument({
-    data: uint8Array,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    useSystemFonts: true
-  });
-
-  const pdf = await loadingTask.promise;
-  let fullText = '';
-
+  const data = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  let text = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+    const content = await page.getTextContent();
+    text += content.items.map((item: any) => item.str).join(' ') + '\n';
   }
-
-  return fullText;
+  return text;
 }
 
 function cleanText(text: string): string {
-  let cleaned = text.replace(/\r\n/g, '\n').replace(/\t/g, ' ');
-  cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '');
-  cleaned = cleaned.replace(/https?:\/\/[^\s\n]{5,}/gi, '');
-  cleaned = cleaned.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
-
-  const lines = cleaned.split('\n').filter(line => {
-    const t = line.trim();
-    if (!t) return true;
-    if (/^[\d\s.。,，、;；:：]+$/.test(t)) return false;
-    if (t.length < 10 && !/[的一是不了在和人中有]/.test(t)) return false;
-    return true;
-  });
-
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
+  return text.replace(/\r\n/g, '\n').replace(/\t/g, ' ')
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
+    .replace(/https?:\/\/[^\s\n]{5,}/gi, '').replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '')
+    .split('\n').filter(l => {
+      const t = l.trim();
+      if (!t) return true;
+      if (/^[\d\s.。,，、;；:：]+$/.test(t)) return false;
+      if (t.length < 10 && !/[的一是不了在和人中有]/.test(t)) return false;
+      return true;
+    }).join('\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
 }
+
+// Demo data for landing page
+const DEMO_CONTENT = `关键路径法是项目管理中最重要的概念之一。
+关键路径是指项目中时间最长的活动序列，它决定了项目的最短完成时间。
+关键路径上的活动没有浮动时间，任何延迟都会导致整个项目延迟。
+总时差是指在不延误项目完工日期的前提下，活动可以延迟的时间。
+自由时差是指在不影响紧后活动最早开始时间的前提下，活动可以延迟的时间。
+挣值管理是项目成本和进度绩效分析的标准化方法。
+计划值(PV)是应该完成工作的预算成本。
+实际成本(AC)是已完成工作的实际花费。
+挣值(EV)是已完成工作的预算价值。
+进度绩效指数(SPI) = EV/PV，SPI大于1表示进度超前。
+成本绩效指数(CPI) = EV/AC，CPI大于1表示成本节约。`;
+
+const DEMO_GUIDE: LearningGuide = {
+  title: '系统集成项目管理 - 关键路径与挣值管理',
+  topic: '项目管理',
+  overview: '掌握项目管理的核心计算方法：关键路径法和挣值管理',
+  chapters: [
+    {
+      id: 'ch1',
+      chapter: '第一章：关键路径法',
+      summary: '理解关键路径的概念和计算方法',
+      keyPoints: ['关键路径定义', '总时差计算', '自由时差计算', '六标时图'],
+      importance: 'high'
+    },
+    {
+      id: 'ch2',
+      chapter: '第二章：挣值管理',
+      summary: '掌握成本和进度绩效分析',
+      keyPoints: ['PV/AC/EV三参数', 'SPI/CPI两指标', '完工估算EAC', '绩效分析'],
+      importance: 'high'
+    }
+  ],
+  studyTips: ['先理解概念再做计算', '多做真题练习']
+};
 
 export default function Home() {
   const [view, setView] = useState<View>('home');
   const [step, setStep] = useState<Step>('input');
-  const [inputText, setInputText] = useState('');
   const [topicInput, setTopicInput] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [extractedPdfText, setExtractedPdfText] = useState<string>('');
   const [books, setBooks] = useState<Book[]>([]);
-  const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [learningGuide, setLearningGuide] = useState<LearningGuide | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [extractedText, setExtractedText] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [pdfExtracting, setPdfExtracting] = useState(false);
-  const [pdfScanning, setPdfScanning] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [completedChapters, setCompletedChapters] = useState<Set<string>>(new Set());
-  const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  // Demo flow state
+  const [demoStarted, setDemoStarted] = useState(false);
+  const [demoStep, setDemoStep] = useState(0); // 0:input 1:concepts 2:quiz 3:result
+  const [quizAnswers, setQuizAnswers] = useState<QuizAnswer[]>([]);
+  const [quizFeedback, setQuizFeedback] = useState<QuizFeedback | null>(null);
+  
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('focusforge_books');
-    if (saved) {
-      try {
-        setBooks(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to load books:', e);
-      }
-    }
+    const saved = localStorage.getItem('ff_books');
+    if (saved) setBooks(JSON.parse(saved));
   }, []);
 
-  const saveBooks = useCallback((updated: Book[]) => {
+  const saveBooks = (updated: Book[]) => {
     setBooks(updated);
-    localStorage.setItem('focusforge_books', JSON.stringify(updated));
-  }, []);
-
-  const triggerConfetti = () => {
-    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    localStorage.setItem('ff_books', JSON.stringify(updated));
   };
 
-  const processPDFFile = async (file: File) => {
-    setSelectedFile(file);
-    setPdfExtracting(true);
-    setPdfScanning(true);
+  const triggerConfetti = () => confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
 
+  // Demo functions
+  const startDemo = () => {
+    setDemoStarted(true);
+    setDemoStep(0);
+    setQuizAnswers([]);
+    setQuizFeedback(null);
+  };
+
+  const submitDemoInput = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLearningGuide(DEMO_GUIDE);
+      setDemoStep(1);
+      setLoading(false);
+    }, 1500);
+  };
+
+  const startDemoQuiz = () => {
+    setDemoStep(2);
+    setQuizAnswers([]);
+    setQuizFeedback(null);
+  };
+
+  const submitQuizAnswer = async (selected: number) => {
+    const correctAnswer = 0;
+    const isCorrect = selected === correctAnswer;
+    
+    setQuizAnswers([...quizAnswers, { questionId: 'q1', selected, correct: isCorrect }]);
+    
     try {
-      const text = await extractTextFromPDF(file);
-      const cleaned = cleanText(text);
-      setExtractedPdfText(cleaned);
-    } catch (error) {
-      console.error('PDF extraction failed:', error);
-      alert('PDF 提取失败');
-      setSelectedFile(null);
-    } finally {
-      setPdfExtracting(false);
-      setPdfScanning(false);
+      const res = await fetch('/api/quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: 'q1',
+          question: '关键路径是指什么？',
+          options: ['项目中最长的活动序列', '最短的活动序列', '任意一条路径', '成本最低的路径'],
+          userAnswerIndex: selected,
+          correctAnswerIndex: correctAnswer
+        })
+      });
+      const data = await res.json();
+      setQuizFeedback(data);
+    } catch {
+      setQuizFeedback({
+        correct: isCorrect,
+        explanation: isCorrect ? '正确！关键路径确实是项目中最长的活动序列。' : '不对，关键路径不是最短的...',
+        hint: isCorrect ? '' : '回想一下关键路径的定义——它是决定项目最短工期的那个路径。'
+      });
     }
+    
+    if (isCorrect) triggerConfetti();
   };
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
+  const finishDemo = () => {
+    setDemoStarted(false);
+    setDemoStep(0);
+    setLearningGuide(null);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
+  const searchByTopic = async () => {
+    if (!topicInput.trim()) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: topicInput })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      const guide = data.learningGuide || data;
+      setLearningGuide(guide);
+      setStep('report');
+      
+      const book: Book = {
+        id: Date.now().toString(),
+        name: guide.title || topicInput,
+        topic: topicInput,
+        createdAt: new Date().toISOString(),
+        progress: 0,
+        learningGuide: guide
+      };
+      saveBooks([book, ...books]);
+    } catch (e: any) {
+      setError(e.message || '搜索失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (files && files[0]) {
-      const file = files[0];
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      if (isPdf) {
-        await processPDFFile(file);
-      } else {
-        alert('请上传 PDF 文件');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      setSelectedFile(file);
+      setExtracting(true);
+      try {
+        const text = await extractTextFromPDF(file);
+        setExtractedText(cleanText(text));
+      } catch {
+        setError('PDF 提取失败');
       }
-    }
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) {
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      if (isPdf) {
-        await processPDFFile(file);
-      } else {
-        alert('请选择 PDF 文件');
-      }
-    }
-  };
-
-  const searchByTopic = async () => {
-    if (!topicInput.trim()) return;
-    setStep('generating');
-    setErrorMessage(null);
-
-    try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topicInput }),
-      });
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      setLearningGuide(data);
-
-      const newBook: Book = {
-        id: Date.now().toString(),
-        name: data.title || data.topic || topicInput,
-        topic: topicInput,
-        createdAt: new Date().toISOString(),
-        progress: 0,
-        completedChapters: [],
-        learningGuide: data,
-      };
-      saveBooks([newBook, ...books]);
-
-      setStep('report');
-    } catch (err: any) {
-      setErrorMessage(err.message || '搜索失败');
-      setStep('input');
+      setExtracting(false);
+    } else {
+      setError('请上传 PDF 文件');
     }
   };
 
   const generateFromPdf = async () => {
-    if (!extractedPdfText.trim()) return;
-    setStep('generating');
-    setErrorMessage(null);
-
+    if (!extractedText) return;
+    setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: extractedPdfText }),
+        body: JSON.stringify({ text: extractedText })
       });
-
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-
       const guide = data.learningGuide || data;
       setLearningGuide(guide);
       setStep('report');
-    } catch (err: any) {
-      setErrorMessage(err.message || '生成失败');
-      setStep('input');
+    } catch (e: any) {
+      setError(e.message || '生成失败');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getChapterStatus = (ch: Chapter, index: number): 'completed' | 'learning' | 'locked' => {
-    if (completedChapters.has(ch.id)) return 'completed';
-    if (index === 0 || completedChapters.has(learningGuide?.chapters[index - 1]?.id || '')) return 'learning';
-    return 'locked';
-  };
-
-  const completeChapter = () => {
-    const ch = learningGuide?.chapters[currentChapterIndex];
-    if (!ch) return;
-    const newCompleted = new Set(completedChapters);
-    newCompleted.add(ch.id);
-    setCompletedChapters(newCompleted);
-    triggerConfetti();
-  };
-
-  const formatDate = (s: string) => new Date(s).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-
-  // Home View
+  // Home View with Demo
   if (view === 'home') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        {/* Header */}
+        <div className="max-w-4xl mx-auto pt-8 px-4 text-center">
+          <h1 className="text-5xl font-bold mb-3 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
             FocusForge
           </h1>
-          <p className="text-slate-400 text-lg">AI 驱动的智能学习引擎</p>
+          <p className="text-slate-400 text-lg mb-2">
+            把時間投入轉化為真正的肌肉記憶
+          </p>
+          <p className="text-slate-500 text-sm">
+            粘貼任何學習材料，開始刻意練習
+          </p>
         </div>
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-6">
-          <button
-            onClick={() => { setView('topic'); setStep('input'); }}
-            className="bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl p-8 text-left hover:from-cyan-500/30 hover:to-blue-500/30 transition-all border border-cyan-500/30"
-          >
-            <div className="text-4xl mb-4">🔍</div>
-            <h2 className="text-2xl font-bold mb-2">智能搜索学习</h2>
-            <p className="text-slate-400 text-sm">输入主题，AI 自动搜集资料、教材、网课</p>
-          </button>
-          <button
-            onClick={() => { setView('learning'); setStep('input'); }}
-            className="bg-slate-800/50 rounded-2xl p-8 text-left hover:bg-slate-800/70 transition-all border border-slate-700"
-          >
-            <div className="text-4xl mb-4">📄</div>
-            <h2 className="text-2xl font-bold mb-2">PDF 学习</h2>
-            <p className="text-slate-400 text-sm">上传 PDF 提取内容学习</p>
-          </button>
-          <button
-            onClick={() => setView('bookshelf')}
-            className="bg-slate-800/50 rounded-2xl p-8 text-left hover:bg-slate-800/70 transition-all border border-slate-700"
-          >
-            <div className="text-4xl mb-4">📖</div>
-            <h2 className="text-2xl font-bold mb-2">我的书架</h2>
-            <p className="text-slate-400 text-sm">{books.length > 0 ? `${books.length} 本学习资料` : '查看历史学习'}</p>
-          </button>
+
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* Demo Section */}
+          <div className="bg-slate-800/50 rounded-2xl p-6 mb-8 border border-cyan-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-cyan-400">⚡ 免費試用</h2>
+              {!demoStarted && (
+                <button onClick={startDemo} className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30 transition">
+                  點擊試用 Demo
+                </button>
+              )}
+            </div>
+
+            {!demoStarted ? (
+              <p className="text-slate-400 text-sm">
+                粘貼内容太麻煩？直接點擊試用，體驗完整學習流程
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {/* Demo Steps */}
+                <div className="flex gap-2 mb-4">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className={`flex-1 h-1 rounded ${demoStep >= i ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                  ))}
+                </div>
+
+                {/* Step 0: Input */}
+                {demoStep === 0 && (
+                  <div className="space-y-3">
+                    <p className="text-slate-300">預填充了「關鍵路徑法」相關內容，點擊開始學習：</p>
+                    <textarea
+                      value={DEMO_CONTENT.slice(0, 200)}
+                      readOnly
+                      className="w-full h-24 p-3 bg-slate-900/50 rounded-lg text-slate-400 text-sm resize-none"
+                    />
+                    {loading ? (
+                      <div className="flex items-center gap-2 text-cyan-400">
+                        <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                        AI 分析中...
+                      </div>
+                    ) : (
+                      <button onClick={submitDemoInput} className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium">
+                        🚀 開始學習
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 1: Concepts */}
+                {demoStep === 1 && learningGuide && (
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-lg">📖 概念拆解</h3>
+                    {learningGuide.chapters.map((ch, i) => (
+                      <div key={ch.id} className="bg-slate-900/50 rounded-lg p-3">
+                        <h4 className="font-medium text-cyan-400">{i + 1}. {ch.chapter}</h4>
+                        <p className="text-sm text-slate-400 mt-1">{ch.summary}</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {ch.keyPoints.map((kp, j) => (
+                            <span key={j} className="text-xs px-2 py-1 bg-slate-700 rounded">{kp}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={startDemoQuiz} className="w-full py-3 bg-purple-500 rounded-xl font-medium mt-4">
+                      📝 開始答題練習
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 2: Quiz */}
+                {demoStep === 2 && (
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-lg">📝 測驗</h3>
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <p className="font-medium mb-3">關鍵路徑是指什麼？</p>
+                      {['項目中最長的活動序列', '最短的活動序列', '任意一條路徑', '成本最低的路徑'].map((opt, i) => {
+                        const answered = quizAnswers.length > 0;
+                        const isSelected = quizAnswers[0]?.selected === i;
+                        const isCorrect = i === 0;
+                        let bgClass = 'bg-slate-700 hover:bg-slate-600';
+                        if (answered) {
+                          if (isCorrect) bgClass = 'bg-green-500/30 border border-green-500';
+                          else if (isSelected) bgClass = 'bg-red-500/30 border border-red-500';
+                        }
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => !answered && submitQuizAnswer(i)}
+                            disabled={answered}
+                            className={`w-full p-3 rounded-lg text-left mb-2 transition ${bgClass} ${answered ? '' : 'cursor-pointer'}`}
+                          >
+                            {String.fromCharCode(65 + i)}. {opt}
+                            {answered && isCorrect && <span className="float-right text-green-400">✓</span>}
+                            {answered && isSelected && !isCorrect && <span className="float-right text-red-400">✗</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    {quizFeedback && (
+                      <div className={`p-4 rounded-lg ${quizFeedback.correct ? 'bg-green-500/20 border border-green-500/30' : 'bg-blue-500/20 border border-blue-500/30'}`}>
+                        <p className="text-sm">{quizFeedback.explanation}</p>
+                        {!quizFeedback.correct && quizFeedback.hint && (
+                          <p className="text-sm text-cyan-400 mt-2">💡 {quizFeedback.hint}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {quizAnswers.length > 0 && (
+                      <button onClick={finishDemo} className="w-full py-3 bg-slate-700 rounded-xl mt-4">
+                        {quizAnswers[0].correct ? '🎉 完成 Demo' : '🔄 重新嘗試'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Main Actions */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <button onClick={() => setView('topic')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
+              <div className="text-3xl mb-3">🔍</div>
+              <h3 className="font-bold mb-1">智能搜索</h3>
+              <p className="text-slate-400 text-sm">輸入主題，AI 搜集資料</p>
+            </button>
+            <button onClick={() => setView('learning')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
+              <div className="text-3xl mb-3">📄</div>
+              <h3 className="font-bold mb-1">PDF 學習</h3>
+              <p className="text-slate-400 text-sm">上傳教材，粘貼內容</p>
+            </button>
+            <button onClick={() => setView('bookshelf')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
+              <div className="text-3xl mb-3">📖</div>
+              <h3 className="font-bold mb-1">我的書架</h3>
+              <p className="text-slate-400 text-sm">{books.length} 本學習資料</p>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -340,279 +458,191 @@ export default function Home() {
 
   // Topic Search View
   if (view === 'topic') {
-    if (step === 'input') {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-          <div className="max-w-3xl mx-auto">
-            <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-8">
-              返回主页
-            </button>
-            <div className="text-center mb-8">
-              <div className="text-6xl mb-4">🔍</div>
-              <h1 className="text-3xl font-bold mb-2">智能搜索学习</h1>
-              <p className="text-slate-400">输入你想学习的主题，AI 会自动上网搜集资料、教材、网课</p>
+    return (
+      <div className="min-h-screen bg-slate-900 text-white p-4">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-6">
+            ← 返回
+          </button>
+          <div className="text-center mb-8">
+            <div className="text-5xl mb-3">🔍</div>
+            <h1 className="text-2xl font-bold mb-2">智能搜索學習</h1>
+            <p className="text-slate-400">輸入主題，AI 自動搜集資料、教材、網課</p>
+          </div>
+          <div className="bg-slate-800/50 rounded-xl p-6">
+            <textarea
+              value={topicInput}
+              onChange={e => setTopicInput(e.target.value)}
+              placeholder="例如：系統集成項目管理工程師軟考"
+              className="w-full h-32 p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none mb-4"
+            />
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-500">提供主題名稱或考試名稱</span>
+              <button
+                onClick={searchByTopic}
+                disabled={!topicInput.trim() || loading}
+                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    搜索中...
+                  </span>
+                ) : '🔍 開始搜索'}
+              </button>
             </div>
-            <div className="bg-slate-800/50 rounded-2xl p-6">
-              <textarea
-                value={topicInput}
-                onChange={(e) => setTopicInput(e.target.value)}
-                placeholder="例如：系统集成项目管理工程师软考"
-                className="w-full h-32 p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none mb-4"
-              />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-500">提供主题名称、考试名称或学习方向</span>
-                <button
-                  onClick={searchByTopic}
-                  disabled={!topicInput.trim()}
-                  className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium disabled:opacity-50"
-                >
-                  🔍 开始搜索
-                </button>
+            {error && (
+              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {error}
               </div>
-              {errorMessage && (
-                <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-xl">
-                  <p className="text-red-400 text-center">{errorMessage}</p>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (step === 'generating') {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8 flex items-center justify-center">
-          <div className="text-center">
-            <div className="text-6xl mb-4 animate-pulse">🔍</div>
-            <h2 className="text-2xl font-bold mb-2">AI 正在搜索资料...</h2>
-            <p className="text-slate-400">搜集官方教材，真题、网课等资源</p>
-            <div className="mt-6 flex justify-center gap-2">
-              <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce" />
-              <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: 150 }} />
-              <div className="w-3 h-3 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: 300 }} />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (step === 'report' && learningGuide) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-          <div className="max-w-4xl mx-auto">
-            <button
-              onClick={() => { setStep('input'); setTopicInput(''); }}
-              className="text-slate-400 hover:text-white mb-4"
+  // Learning/PDF View
+  if (view === 'learning') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white p-4">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-6">
+            ← 返回
+          </button>
+          <div className="bg-slate-800/50 rounded-xl p-6">
+            <div
+              onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDragOver={e => e.preventDefault()}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-8 text-center transition ${isDragging ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-600'}`}
             >
-              新搜索
-            </button>
-            <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-2xl p-6 border border-cyan-500/30 mb-6">
-              <h1 className="text-2xl font-bold mb-2">📚 {learningGuide.title || learningGuide.topic}</h1>
-              <p className="text-slate-300">{learningGuide.overview}</p>
+              <input ref={fileRef} type="file" accept=".pdf" onChange={e => {
+                const f = e.target.files e.target.files?.[0]e.target.files?.[0] e.target.files[0];
+                if (f) {
+                  setSelectedFile(f);
+                  setExtracting(true);
+                  extractTextFromPDF(f).then(t => {
+                    setExtractedText(cleanText(t));
+                    setExtracting(false);
+                  }).catch(() => {
+                    setError('PDF 提取失敗');
+                    setExtracting(false);
+                  });
+                }
+              }} className="hidden" id="pdf" />
+              <label htmlFor="pdf" className="cursor-pointer">
+                {extracting ? (
+                  <div className="text-cyan-400">⚡ 提取中...</div>
+                ) : selectedFile ? (
+                  <div>
+                    <div className="text-3xl mb-2">✅</div>
+                    <div className="text-cyan-400">{selectedFile.name}</div>
+                    <div className="text-slate-400 text-sm">點擊更換</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="text-4xl mb-2">{isDragging ? '📥' : '📎'}</div>
+                    <div className="text-slate-300">{isDragging ? '鬆開上傳' : '點擊或拖拽 PDF'}</div>
+                  </div>
+                )}
+              </label>
             </div>
-
-            {learningGuide.resources && (
-              <div className="space-y-6 mb-6">
-                {learningGuide.resources.textbooks && learningGuide.resources.textbooks.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <h3 className="text-xl font-bold mb-3">📖 官方教材</h3>
-                    <div className="grid gap-3">
-                      {learningGuide.resources.textbooks.map((r, i) => (
-                        <a
-                          key={i}
-                          href={r.url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-slate-700/30 rounded-lg p-3 hover:bg-slate-700/50 transition-all"
-                        >
-                          <h4 className="font-medium text-cyan-400">{r.title}</h4>
-                          <p className="text-sm text-slate-400">{r.description}</p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {learningGuide.resources.pastPapers && learningGuide.resources.pastPapers.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <h3 className="text-xl font-bold mb-3">📝 历年真题</h3>
-                    <div className="grid gap-3">
-                      {learningGuide.resources.pastPapers.map((r, i) => (
-                        <a
-                          key={i}
-                          href={r.url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-slate-700/30 rounded-lg p-3 hover:bg-slate-700/50 transition-all"
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-medium text-purple-400">{r.title}</h4>
-                            {r.year && <span className="text-xs bg-purple-500/30 px-2 py-0.5 rounded">{r.year}</span>}
-                          </div>
-                          <p className="text-sm text-slate-400">{r.description}</p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {learningGuide.resources.onlineCourses && learningGuide.resources.onlineCourses.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <h3 className="text-xl font-bold mb-3">🎬 优质网课</h3>
-                    <div className="grid gap-3">
-                      {learningGuide.resources.onlineCourses.map((r, i) => (
-                        <a
-                          key={i}
-                          href={r.url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-slate-700/30 rounded-lg p-3 hover:bg-slate-700/50 transition-all"
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-medium text-green-400">{r.title}</h4>
-                            {r.platform && <span className="text-xs bg-green-500/30 px-2 py-0.5 rounded">{r.platform}</span>}
-                          </div>
-                          {r.instructor && <p className="text-sm text-slate-400">讲师：{r.instructor}</p>}
-                          <p className="text-sm text-slate-400">{r.description}</p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {learningGuide.resources.studyNotes && learningGuide.resources.studyNotes.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <h3 className="text-xl font-bold mb-3">📒 学习笔记</h3>
-                    <div className="grid gap-3">
-                      {learningGuide.resources.studyNotes.map((r, i) => (
-                        <a
-                          key={i}
-                          href={r.url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-slate-700/30 rounded-lg p-3 hover:bg-slate-700/50 transition-all"
-                        >
-                          <h4 className="font-medium text-yellow-400">{r.title}</h4>
-                          {r.author && <p className="text-sm text-slate-400">作者：{r.author}</p>}
-                          <p className="text-sm text-slate-400">{r.description}</p>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            
+            {extractedText && (
+              <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
+                <p className="text-xs text-slate-500 mb-1">預覽（{extractedText.length.toLocaleString()} 字）</p>
+                <p className="text-sm text-slate-400 line-clamp-3">{extractedText.slice(0, 300)}...</p>
               </div>
             )}
 
-            {learningGuide.studyPlan && (
-              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-                <h3 className="text-xl font-bold mb-3">📅 学习计划</h3>
-                {learningGuide.studyPlan.duration && <p className="text-cyan-400 mb-2">建议周期：{learningGuide.studyPlan.duration}</p>}
-                {learningGuide.studyPlan.stages?.map((s, i) => (
-                  <div key={i} className="bg-slate-700/30 rounded-lg p-3 mb-2">
-                    <h4 className="font-medium text-purple-400">{s.stage}</h4>
-                    <p className="text-sm text-slate-400">目标：{s.goal}</p>
-                    {s.resources && <p className="text-xs text-slate-500">资源：{s.resources.join(', ')}</p>}
-                    {s.tasks && <p className="text-xs text-slate-500">任务：{s.tasks.join(', ')}</p>}
-                  </div>
-                ))}
+            <div className="flex justify-between items-center mt-4">
+              <span className="text-sm text-slate-500">
+                {selectedFile ? `已加載 ${(extractedText.length / 1024).toFixed(0)}K 字` : '或粘貼文本'}
+              </span>
+              <button
+                onClick={generateFromPdf}
+                disabled={!extractedText || loading}
+                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium disabled:opacity-50"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    生成中...
+                  </span>
+                ) : '🚀 開始學習'}
+              </button>
+            </div>
+            {error && (
+              <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                {error}
               </div>
             )}
-
-            {learningGuide.chapters && learningGuide.chapters.length > 0 && (
-              <div className="bg-slate-800/50 rounded-xl p-4">
-                <h3 className="text-xl font-bold mb-3">🗺️ 知识框架</h3>
-                <div className="space-y-3">
-                  {learningGuide.chapters.map((ch, i) => (
-                    <div key={ch.id} className="bg-slate-700/30 rounded-lg p-3">
-                      <h4 className="font-medium">{i + 1}. {ch.chapter}</h4>
-                      <p className="text-sm text-slate-400">{ch.summary}</p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {ch.keyPoints.slice(0, 4).map((kp, j) => (
-                          <span key={j} className="text-xs px-2 py-0.5 bg-slate-600/50 rounded">{kp}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {learningGuide.studyTips && learningGuide.studyTips.length > 0 && (
-              <div className="bg-purple-500/10 rounded-xl p-4 border border-purple-500/30 mt-6">
-                <h3 className="font-bold mb-2">💡 学习建议</h3>
-                <ul className="space-y-1">
-                  {learningGuide.studyTips.map((t, i) => (
-                    <li key={i} className="text-slate-300 text-sm">• {t}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            
+            {/* Also show textarea for text input */}
+            <div className="mt-4 pt-4 border-t border-slate-700">
+              <textarea
+                value={extractedText}
+                onChange={e => { setExtractedText(e.target.value); setSelectedFile(null); }}
+                placeholder="或者直接粘貼學習內容..."
+                className="w-full h-24 p-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none text-sm"
+              />
+            </div>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
   }
 
   // Bookshelf View
   if (view === 'bookshelf') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+      <div className="min-h-screen bg-slate-900 text-white p-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
             <div>
-              <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-2">
-                返回主页
+              <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-1">
+                ← 返回
               </button>
-              <h1 className="text-3xl font-bold">📖 我的书架</h1>
+              <h1 className="text-2xl font-bold">📖 我的書架</h1>
             </div>
-            <button
-              onClick={() => setView('topic')}
-              className="px-6 py-3 bg-cyan-500 rounded-xl"
-            >
-              + 新建学习
+            <button onClick={() => setView('topic')} className="px-4 py-2 bg-cyan-500 rounded-lg">
+              + 新建
             </button>
           </div>
 
           {books.length === 0 ? (
-            <div className="bg-slate-800/50 rounded-2xl p-12 text-center">
-              <div className="text-6xl mb-4">📚</div>
-              <h2 className="text-xl font-bold mb-2">书架是空的</h2>
-              <p className="text-slate-400 mb-6">开始搜索主题或上传 PDF 来学习</p>
-              <button
-                onClick={() => setView('topic')}
-                className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl"
-              >
-                开始学习
-              </button>
+            <div className="bg-slate-800/50 rounded-xl p-8 text-center">
+              <div className="text-5xl mb-3">📚</div>
+              <h2 className="text-xl font-bold mb-2">書架是空的</h2>
+              <p className="text-slate-400 mb-4">開始搜索主題或上傳 PDF 來學習</p>
+              <div className="flex gap-3 justify-center">
+                <button onClick={() => setView('topic')} className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl">
+                  🔍 智能搜索
+                </button>
+                <button onClick={() => setView('learning')} className="px-6 py-3 bg-slate-700 rounded-xl">
+                  📄 PDF 學習
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="grid gap-4">
-              {books.map((book) => (
+            <div className="space-y-3">
+              {books.map(book => (
                 <div key={book.id} className="bg-slate-800/50 rounded-xl p-4 flex items-center gap-4">
                   <div className="text-3xl">📕</div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg truncate">{book.name}</h3>
-                    <p className="text-slate-400 text-sm">{book.topic || 'PDF学习'}</p>
+                    <h3 className="font-bold truncate">{book.name}</h3>
+                    <p className="text-slate-400 text-sm">{book.topic || 'PDF學習'}</p>
                     <div className="mt-2">
-                      <div className="h-2 bg-slate-700 rounded-full">
-                        <div
-                          className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
-                          style={{ width: `${book.progress}%` }}
-                        />
+                      <div className="h-1.5 bg-slate-700 rounded-full">
+                        <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style={{ width: `${book.progress}%` }} />
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">{book.progress}%</p>
+                      <p className="text-xs text-slate-500 mt-1">{book.progress}% 完成</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => {
-                      if (book.learningGuide) {
-                        setLearningGuide(book.learningGuide);
-                        setStep('report');
-                      } else {
-                        setView('topic');
-                      }
-                    }}
+                    onClick={() => { if (book.learningGuide) { setLearningGuide(book.learningGuide); setStep('report'); } else setView('topic'); }}
                     className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg"
                   >
                     查看
@@ -626,93 +656,101 @@ export default function Home() {
     );
   }
 
-  // Learning/PDF View
-  if (view === 'learning') {
-    if (step === 'input') {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-8">
-          <div className="max-w-3xl mx-auto">
-            <button onClick={() => setView('home')} className="text-slate-400 hover:text-white mb-8">
-              返回主页
-            </button>
-            <div className="bg-slate-800/50 rounded-2xl p-6">
-              <div
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-8 text-center ${
-                  isDragging ? 'border-cyan-500 bg-cyan-500/20' : 'border-slate-600'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="pdf-upload"
-                />
-                <label htmlFor="pdf-upload" className="cursor-pointer">
-                  {pdfScanning ? (
-                    <div>
-                      <div className="text-4xl mb-2 animate-pulse">🔍</div>
-                      <p className="text-cyan-400">扫描内容...</p>
-                    </div>
-                  ) : pdfExtracting ? (
-                    <div>
-                      <div className="text-4xl mb-2 animate-pulse">⚡</div>
-                      <p className="text-cyan-400">提取中...</p>
-                    </div>
-                  ) : selectedFile ? (
-                    <div>
-                      <div className="text-4xl mb-2">✅</div>
-                      <p className="text-cyan-400">{selectedFile.name}</p>
-                      <p className="text-slate-400 text-sm">
-                        ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-4xl mb-2">{isDragging ? '📥' : '📎'}</div>
-                      <p className="text-slate-300">
-                        {isDragging ? '松开上传' : '点击或拖拽 PDF'}
-                      </p>
-                    </div>
-                  )}
-                </label>
-              </div>
+  // Report View
+  if (step === 'report' && learningGuide) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white p-4">
+        <div className="max-w-3xl mx-auto">
+          <button onClick={() => { setStep('input'); setLearningGuide(null); }} className="text-slate-400 hover:text-white mb-4">
+            ← 新搜索
+          </button>
 
-              {extractedPdfText && (
-                <div className="mt-4">
-                  <p className="text-sm text-slate-500 mb-2">
-                    预览（{extractedPdfText.length.toLocaleString()} 字）
-                  </p>
-                  <div className="p-3 bg-slate-900/50 rounded text-sm text-slate-400 max-h-32 overflow-auto">
-                    {extractedPdfText.slice(0, 1500)}...
+          <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl p-6 border border-cyan-500/30 mb-6">
+            <h1 className="text-2xl font-bold mb-2">📚 {learningGuide.title}</h1>
+            <p className="text-slate-300">{learningGuide.overview}</p>
+          </div>
+
+          {/* Resources */}
+          {learningGuide.resources && (
+            <div className="space-y-4 mb-6">
+              {learningGuide.resources.textbooks?.length ? (
+                <div className="bg-slate-800/50 rounded-xl p-4">
+                  <h3 className="font-bold mb-3">📖 官方教材</h3>
+                  <div className="space-y-2">
+                    {learningGuide.resources.textbooks.map((r, i) => (
+                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700">
+                        <div className="text-cyan-400 font-medium">{r.title}</div>
+                        <div className="text-sm text-slate-400">{r.description}</div>
+                      </a>
+                    ))}
                   </div>
                 </div>
-              )}
+              ) : null}
+              {learningGuide.resources.onlineCourses?.length ? (
+                <div className="bg-slate-800/50 rounded-xl p-4">
+                  <h3 className="font-bold mb-3">🎬 優質網課</h3>
+                  <div className="space-y-2">
+                    {learningGuide.resources.onlineCourses.map((r, i) => (
+                      <a key={i} href={r.url || '#'} target="_blank" className="block p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700">
+                        <div className="flex justify-between">
+                          <span className="text-green-400 font-medium">{r.title}</span>
+                          {r.platform && <span className="text-xs bg-green-500/30 px-2 py-0.5 rounded">{r.platform}</span>}
+                        </div>
+                        {r.instructor && <div className="text-sm text-slate-400">講師：{r.instructor}</div>}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
 
-              <div className="flex justify-between items-center mt-6">
-                <span className="text-sm text-slate-500">
-                  {selectedFile
-                    ? `已加载 ${(extractedPdfText.length / 1024).toFixed(0)}K 字`
-                    : '上传 PDF'}
-                </span>
-                <button
-                  onClick={generateFromPdf}
-                  disabled={!extractedPdfText || pdfExtracting}
-                  className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl disabled:opacity-50"
-                >
-                  🚀 开始学习
-                </button>
-              </div>
+          {/* Chapters */}
+          <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+            <h3 className="font-bold mb-3">🗺️ 知識框架</h3>
+            <div className="space-y-2">
+              {learningGuide.chapters.map((ch, i) => (
+                <div key={ch.id} className="p-3 bg-slate-700/50 rounded-lg">
+                  <h4 className="font-medium">{i + 1}. {ch.chapter}</h4>
+                  <p className="text-sm text-slate-400">{ch.summary}</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {ch.keyPoints.map((kp, j) => (
+                      <span key={j} className="text-xs px-2 py-1 bg-slate-600 rounded">{kp}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Study Plan */}
+          {learningGuide.studyPlan?.stages?.length ? (
+            <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+              <h3 className="font-bold mb-3">📅 學習計劃</h3>
+              {learningGuide.studyPlan.duration && <p className="text-cyan-400 text-sm mb-2">{learningGuide.studyPlan.duration}</p>}
+              {learningGuide.studyPlan.stages.map((s, i) => (
+                <div key={i} className="p-3 bg-slate-700/50 rounded-lg mb-2">
+                  <div className="text-purple-400 font-medium">{s.stage}</div>
+                  <div className="text-sm text-slate-400">目標：{s.goal}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {/* Tips */}
+          {learningGuide.studyTips?.length ? (
+            <div className="bg-purple-500/10 rounded-xl p-4 border border-purple-500/30">
+              <h3 className="font-bold mb-2">💡 學習建議</h3>
+              <ul className="space-y-1">
+                {learningGuide.studyTips.map((t, i) => (
+                  <li key={i} className="text-sm text-slate-300">• {t}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
-      );
-    }
+      </div>
+    );
   }
 
   return null;
