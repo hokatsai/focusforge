@@ -84,6 +84,49 @@ async function extractTextFromPDF(file: File): Promise<string> {
   return text;
 }
 
+// Chunked PDF extraction for large files
+async function extractTextFromPDFChunked(
+  file: File, 
+  onProgress?: (current: number, total: number) => void
+): Promise<string> {
+  if (!window.pdfjsLib) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    document.head.appendChild(script);
+    await new Promise<void>((resolve) => { script.onload = () => resolve(); });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  
+  const data = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+  const totalPages = pdf.numPages;
+  let text = '';
+  
+  const CHUNK_SIZE = 50; // Extract 50 pages at a time
+  
+  for (let i = 1; i <= totalPages; i += CHUNK_SIZE) {
+    const endPage = Math.min(i + CHUNK_SIZE - 1, totalPages);
+    let chunkText = '';
+    
+    for (let j = i; j <= endPage; j++) {
+      const page = await pdf.getPage(j);
+      const content = await page.getTextContent();
+      chunkText += content.items.map((item: any) => item.str).join(' ') + '\n';
+    }
+    
+    text += chunkText + '\n';
+    
+    if (onProgress) {
+      onProgress(endPage, totalPages);
+    }
+    
+    // Small delay to prevent UI blocking
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  
+  return text;
+}
+
 function cleanText(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\t/g, ' ')
     .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '')
@@ -143,6 +186,7 @@ export default function Home() {
   const [extractedText, setExtractedText] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [extractingProgress, setExtractingProgress] = useState({ current: 0, total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -344,15 +388,20 @@ export default function Home() {
     if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
       setSelectedFile(file);
       setExtracting(true);
+      setExtractingProgress({ current: 0, total: 0 });
       setError('');
       try {
-        const text = await extractTextFromPDF(file);
+        // Use chunked extraction for progress feedback
+        const text = await extractTextFromPDFChunked(file, (current, total) => {
+          setExtractingProgress({ current, total });
+        });
         setExtractedText(cleanText(text));
       } catch (err) {
         setError('PDF 提取失败，请尝试粘贴文本');
         console.error('PDF error:', err);
       }
       setExtracting(false);
+      setExtractingProgress({ current: 0, total: 0 });
     } else {
       setError('请上传 PDF 文件');
     }
@@ -913,18 +962,36 @@ export default function Home() {
                 if (f) {
                   setSelectedFile(f);
                   setExtracting(true);
-                  extractTextFromPDF(f).then(t => {
+                  setExtractingProgress({ current: 0, total: 0 });
+                  setError('');
+                  extractTextFromPDFChunked(f, (current, total) => {
+                    setExtractingProgress({ current, total });
+                  }).then(t => {
                     setExtractedText(cleanText(t));
                     setExtracting(false);
+                    setExtractingProgress({ current: 0, total: 0 });
                   }).catch(() => {
                     setError('PDF 提取失敗');
                     setExtracting(false);
+                    setExtractingProgress({ current: 0, total: 0 });
                   });
                 }
               }} className="hidden" id="pdf" />
               <label htmlFor="pdf" className="cursor-pointer">
                 {extracting ? (
-                  <div className="text-gray-600">⚡ 提取中...</div>
+                  <div className="text-gray-600">
+                    {extractingProgress.total > 0 ? (
+                      <div className="text-center">
+                        <div className="text-sm mb-1">⚡ 提取中... {extractingProgress.current}/{extractingProgress.total} 页</div>
+                        <div className="w-32 h-1 bg-gray-200 rounded-full mx-auto">
+                          <div 
+                            className="h-full bg-cyan-500 rounded-full transition-all" 
+                            style={{ width: `${(extractingProgress.current / extractingProgress.total) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : '⚡ 提取中...'}
+                  </div>
                 ) : selectedFile ? (
                   <div>
                     <div className="text-3xl mb-2">✅</div>
