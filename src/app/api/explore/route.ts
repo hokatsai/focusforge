@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Tavily API key - better search results than DuckDuckGo
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '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';
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
 interface SearchResult {
   title: string;

@@ -261,7 +261,7 @@ export default function Home() {
   };
 
   const startDemoQuiz = () => {
-    setDemoStep(3); // Go to timer first
+    setDemoStep(2); // Go to timer step
     setQuizAnswers([]);
     setQuizFeedback(null);
     resetTimer();
@@ -1103,7 +1103,8 @@ export default function Home() {
                       if (book.learningGuide) { 
                         setLearningGuide(book.learningGuide); 
                         setStep('report'); 
-                        setView('learning');
+                        // If has resources, go to topic view; else go to learning view
+                        setView(book.learningGuide.resources ? 'topic' : 'learning');
                       } else {
                         setView('topic');
                       }
