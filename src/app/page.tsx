@@ -895,7 +895,15 @@ export default function Home() {
                     </div>
                   </div>
                   <button
-                    onClick={() => { if (book.learningGuide) { setLearningGuide(book.learningGuide); setStep('report'); } else setView('topic'); }}
+                    onClick={() => { 
+                      if (book.learningGuide) { 
+                        setLearningGuide(book.learningGuide); 
+                        setStep('report'); 
+                        setView('learning');
+                      } else {
+                        setView('topic');
+                      }
+                    }}
                     className="px-4 py-2 bg-cyan-500/20 text-gray-600 rounded-lg"
                   >
                     查看

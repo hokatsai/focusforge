@@ -1,83 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_PROMPT = `你是一个专业的教材学习规划师。分析提供的教材内容，生成一个基于目录结构的详细学习计划。
+const SYSTEM_PROMPT = `你是一个专业的教材学习规划师。分析提供的教材内容，生成一个全面的学习指南。
 
-**重要：先分析目录结构，然后按章节组织内容**
+**重要规则：**
+1. 内容必须全面，不能遗漏重要章节
+2. 每个章节至少5个核心知识点
+3. 生成足够多的练习题（至少10道）
+4. 输出必须是有效的JSON
 
 **输出格式（严格JSON）：**
 
 {
-  "learningGuide": {
-    "title": "学习指南标题",
-    "overview": "教材概述和学习目标",
-    "tableOfContents": [
-      {"chapter": "第一章", "sections": ["1.1 节", "1.2 节"]},
-      {"chapter": "第二章", "sections": ["2.1 节", "2.2 节"]}
-    ],
-    "chapters": [
-      {
-        "id": "ch_1",
-        "chapter": "第一章：章节名称",
-        "sections": ["小节1.1", "小节1.2"],
-        "summary": "本章内容总结",
-        "keyPoints": ["核心知识点1", "核心知识点2", "核心知识点3"],
-        "importance": "high"
-      }
-    ],
-    "studyTips": ["学习技巧"]
-  },
+  "topic": "根据内容推断的主题",
+  "title": "完整学习指南标题",
+  "overview": "教材概述和学习目标（100字以上）",
+  "chapters": [
+    {
+      "id": "ch_1",
+      "chapter": "第一章：章节名称",
+      "summary": "本章详细总结（50字以上）",
+      "keyPoints": ["核心知识点1", "核心知识点2", "核心知识点3", "核心知识点4", "核心知识点5"],
+      "importance": "high"
+    }
+  ],
   "practiceQuestions": [
     {
       "id": "q1",
       "chapter": "第一章",
-      "question": "练习题问题",
-      "options": ["A选项", "B选项", "C选项", "D选项"],
-      "correctAnswerIndex": 0
+      "question": "练习题问题（完整题干）",
+      "options": ["A选项（完整）", "B选项（完整）", "C选项（完整）", "D选项（完整）"],
+      "correctAnswerIndex": 0,
+      "explanation": "答案解析"
     }
-  ]
-}
-
-**重要规则：**
-
-1. **目录分析（tableOfContents）**：
-   - 如果教材有目录，按目录章节结构组织
-   - 每个章节列出其包含的小节
-   - 这是学习的主要路径
-
-2. **章节内容（chapters）**：
-   - 每个章节包含：章节名称、小节列表、本章总结、核心知识点
-   - 核心知识点要详细（3-8个）
-   - 标注重要性（high/medium/low）
-   - 这是学习的主要内容
-
-3. **练习题（practiceQuestions）**：
-   - 单独存放，学完内容后练习
-   - 按章节分组
-   - 测试对内容的理解和应用
-
-4. **JSON必须正确可解析，只返回JSON**`;
+  ],
+  "studyPlan": {
+    "duration": "建议学习周期",
+    "stages": [
+      {"stage": "第1阶段", "goal": "阶段目标", "tasks": ["任务1", "任务2", "任务3"]},
+      {"stage": "第2阶段", "goal": "阶段目标", "tasks": ["任务1", "任务2", "任务3"]},
+      {"stage": "第3阶段", "goal": "阶段目标", "tasks": ["任务1", "任务2", "任务3"]}
+    ]
+  },
+  "tips": ["学习技巧1", "学习技巧2", "学习技巧3"]
+}`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, action } = await request.json();
+    const { text } = await request.json();
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    const trimmedText = text.trim();
-    if (trimmedText.length === 0) {
-      return NextResponse.json({ error: 'Text is empty' }, { status: 400 });
-    }
-    
-    if (trimmedText.length > 300000) {
-      return NextResponse.json({ error: 'Text exceeds 300,000 character limit' }, { status: 400 });
-    }
+    // Clean and truncate text - keep enough for meaningful analysis
+    const cleanedText = text.replace(/\r\n/g, '\n').replace(/\t/g, ' ').trim();
+    const truncatedText = cleanedText.slice(0, 50000); // 50k chars limit for API
 
     const miniMaxApiKey = process.env.MINIMAX_API_KEY;
-    
+
     if (!miniMaxApiKey) {
-      return NextResponse.json(getMockGuide());
+      return NextResponse.json(getMockGuide(truncatedText));
     }
 
     try {
@@ -91,10 +73,10 @@ export async function POST(request: NextRequest) {
           model: 'MiniMax-M2.7',
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `分析以下教材内容，按目录结构生成学习计划：\n\n${trimmedText.slice(0, 250000)}` }
+            { role: 'user', content: `请分析以下教材内容，生成完整的学习指南：\n\n${truncatedText.slice(0, 30000)}` }
           ],
           temperature: 0.5,
-          max_tokens: 5000
+          max_tokens: 8000
         })
       });
 
@@ -104,21 +86,22 @@ export async function POST(request: NextRequest) {
 
       const data = await response.json();
       let content = data.choices?.[0]?.message?.content;
-      
+
       if (!content) {
-        return NextResponse.json(getMockGuide());
+        return NextResponse.json(getMockGuide(truncatedText));
       }
 
       content = content.trim();
       if (content.startsWith('```')) {
         content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
       }
-      
+
       const result = JSON.parse(content);
       return NextResponse.json(result);
+
     } catch (error) {
       console.error('API error:', error);
-      return NextResponse.json(getMockGuide());
+      return NextResponse.json(getMockGuide(truncatedText));
     }
 
   } catch (error) {
@@ -127,58 +110,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getMockGuide(): any {
+function getMockGuide(text: string): any {
+  // Extract a topic from the text
+  const firstLine = text.split('\n')[0]?.slice(0, 50) || '学习内容';
+  const topic = firstLine.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
+
   return {
-    learningGuide: {
-      title: "系统集成项目管理工程师学习指南",
-      overview: "基于教材内容生成的学习指南，包含章节结构和核心知识点",
-      tableOfContents: [
-        { chapter: "第一章：关键路径法", sections: ["1.1 网络图基础", "1.2 六标时图", "1.3 关键路径计算"] },
-        { chapter: "第二章：挣值管理", sections: ["2.1 三参数", "2.2 四指标", "2.3 ETC/EAC计算"] },
-        { chapter: "第三章：其他计算", sections: ["3.1 三点估算", "3.2 决策树", "3.3 缩短工期"] },
-        { chapter: "第四章：案例分析", sections: ["4.1 解题思路", "4.2 历年真题"] }
-      ],
-      chapters: [
-        {
-          id: "ch_1",
-          chapter: "第一章：关键路径法",
-          sections: ["1.1 网络图基础", "1.2 六标时图", "1.3 关键路径计算"],
-          summary: "本章介绍网络计划图的基本概念和关键路径法",
-          keyPoints: [
-            "网络图：由活动和节点组成的进度模型",
-            "关键路径：项目中时间最长的路径，决定项目最短工期",
-            "六标时图：标注ES、EF、LS、LF四个时间参数",
-            "总时差：在不延误项目的前提下可延误的时间",
-            "自由时差：在不影响紧后活动最早开始时可延误的时间"
-          ],
-          importance: "high"
-        },
-        {
-          id: "ch_2",
-          chapter: "第二章：挣值管理",
-          sections: ["2.1 三参数", "2.2 四指标", "2.3 ETC/EAC计算"],
-          summary: "本章学习项目成本和进度的绩效分析方法",
-          keyPoints: [
-            "PV（计划值）：应完成工作的预算成本",
-            "AC（实际成本）：已完成工作的实际花费",
-            "EV（挣值）：已完成工作的预算价值",
-            "SPI>1表示进度超前，SPI<1表示进度落后",
-            "CPI>1表示成本节约，CPI<1表示成本超支"
-          ],
-          importance: "high"
-        }
-      ],
-      studyTips: [
-        "先理解概念和公式，再通过做题巩固",
-        "重点掌握前两章（关键路径和挣值）",
-        "历年真题要反复练习"
+    topic: topic || '通用学习',
+    title: `${topic || '学习内容'} 完整指南`,
+    overview: `基于您提供的教材内容生成的学习指南。本指南将帮助您系统性地学习${topic || '相关内容'}，包含详细的知识点拆解、学习计划和练习题。`,
+    chapters: [
+      {
+        id: 'ch_1',
+        chapter: '第一章：核心概念',
+        summary: '本章介绍该领域的基础核心概念，帮助建立知识框架。',
+        keyPoints: ['概念一：基础定义', '概念二：核心原理', '概念三：重要特性', '概念四：应用场景', '概念五：与其他概念的关系'],
+        importance: 'high'
+      },
+      {
+        id: 'ch_2',
+        chapter: '第二章：重点知识',
+        summary: '深入讲解该领域的重点知识点，包含详细案例。',
+        keyPoints: ['重点一：详细解释', '重点二：案例分析', '重点三：常见误区', '重点四：解题技巧', '重点五：扩展应用'],
+        importance: 'high'
+      },
+      {
+        id: 'ch_3',
+        chapter: '第三章：实践应用',
+        summary: '将理论知识应用到实际问题中，巩固学习成果。',
+        keyPoints: ['应用一：场景分析', '应用二：问题解决', '应用三：实操练习', '应用四：经验总结', '应用五：进阶方向'],
+        importance: 'medium'
+      }
+    ],
+    practiceQuestions: [
+      { id: 'q1', chapter: '第一章', question: '关于核心概念的说法，以下正确的是？', options: ['选项A：详细描述', '选项B：详细描述', '选项C：详细描述', '选项D：详细描述'], correctAnswerIndex: 0, explanation: '详细解析答案为什么正确' },
+      { id: 'q2', chapter: '第一章', question: '下列关于概念的说法错误的是？', options: ['选项A', '选项B', '选项C', '选项D'], correctAnswerIndex: 1, explanation: '解析错误选项的问题' },
+      { id: 'q3', chapter: '第二章', question: '重点知识的正确理解是？', options: ['选项A', '选项B', '选项C', '选项D'], correctAnswerIndex: 2, explanation: '解析正确答案' },
+      { id: 'q4', chapter: '第二章', question: '以下哪个不是重点知识的应用？', options: ['选项A', '选项B', '选项C', '选项D'], correctAnswerIndex: 3, explanation: '解析为什么其他选项都是应用' },
+      { id: 'q5', chapter: '第三章', question: '实践应用中需要注意什么？', options: ['选项A', '选项B', '选项C', '选项D'], correctAnswerIndex: 0, explanation: '解析实践要点' }
+    ],
+    studyPlan: {
+      duration: '2-4周',
+      stages: [
+        { stage: '第一阶段', goal: '打牢基础', tasks: ['学习第一章核心概念', '整理笔记', '完成基础练习'] },
+        { stage: '第二阶段', goal: '深入理解', tasks: ['学习第二章重点知识', '做进阶练习', '总结常见题型'] },
+        { stage: '第三阶段', goal: '巩固提高', tasks: ['学习第三章实践应用', '做综合练习', '查漏补缺'] }
       ]
     },
-    practiceQuestions: [
-      { id: "q1", chapter: "第一章", question: "关于关键路径的说法正确的是？", options: ["关键路径是时间最长的路径", "关键路径上的活动没有时差", "关键路径可能有多条", "以上都对"], correctAnswerIndex: 3 },
-      { id: "q2", chapter: "第一章", question: "总时差和自由时差的关系是？", options: ["总时差≥自由时差", "总时差≤自由时差", "两者相等", "无法比较"], correctAnswerIndex: 0 },
-      { id: "q3", chapter: "第二章", question: "当SPI=1.2时，表示？", options: ["进度落后20%", "进度超前20%", "成本节约20%", "成本超支20%"], correctAnswerIndex: 1 },
-      { id: "q4", chapter: "第二章", question: "典型偏差的EAC公式是？", options: ["BAC/CPI", "AC+(BAC-EV)", "AC+ETC", "BAC/SPI"], correctAnswerIndex: 0 }
+    tips: [
+      '建议先通读全文了解整体框架，再深入各个章节',
+      '每学完一章记得做练习题巩固',
+      '整理错题本是提高的关键'
     ]
   };
 }
