@@ -64,18 +64,55 @@ async function extractTextFromPDF(file: File): Promise<string> {
   });
   
   const pdf = await loadingTask.promise;
-  let fullText = '';
+  const pageTexts: string[] = [];
   
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => item.str)
-      .join(' ');
-    fullText += pageText + '\n';
+    
+    // Get page dimensions for header/footer detection
+    const viewport = page.getViewport({ scale: 1 });
+    const pageHeight = viewport.height;
+    const pageWidth = viewport.width;
+    
+    // Sort items by position (top to bottom, left to right)
+    const items = textContent.items as any[];
+    items.sort((a, b) => {
+      const yDiff = b.transform[5] - a.transform[5]; // Y position (bottom to top)
+      if (Math.abs(yDiff) > 5) return yDiff; // Different line
+      return a.transform[4] - b.transform[4]; // Same line, left to right
+    });
+    
+    let pageText = '';
+    let lastY = 0;
+    
+    for (const item of items) {
+      const y = item.transform[5];
+      const x = item.transform[4];
+      const text = item.str;
+      
+      // Skip headers (top of page) and footers (bottom of page)
+      // Assuming header/footer is within 5% of page edge
+      const isHeader = y > pageHeight * 0.95;
+      const isFooter = y < pageHeight * 0.05;
+      const isMargin = x < pageWidth * 0.05 || x > pageWidth * 0.95;
+      
+      if (isHeader || isFooter) continue;
+      
+      // Add line break if this is a new line (Y position changed significantly)
+      if (Math.abs(y - lastY) > 5) {
+        if (lastY !== 0) pageText += '\n';
+      }
+      
+      pageText += text + ' ';
+      lastY = y;
+    }
+    
+    pageTexts.push(pageText.trim());
   }
   
-  return fullText;
+  // Join pages with double newline to separate them
+  return pageTexts.filter(t => t.length > 0).join('\n\n');
 }
 
 // Text scanning and cleaning function
@@ -84,56 +121,45 @@ function cleanAndScanText(text: string): { cleaned: string; removedCount: number
   let removedCount = 0;
   const originalLength = text.length;
   
-  cleaned = cleaned.replace(/\s+/g, ' ');
-  cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF]/g, '');
-  cleaned = cleaned.replace(/[。．.]{3,}/g, '...');
-  cleaned = cleaned.replace(/[，,]{3,}/g, ',');
-  cleaned = cleaned.replace(/[！!]{3,}/g, '!!!');
-  cleaned = cleaned.replace(/[？?]{3,}/g, '???');
-  cleaned = cleaned.replace(/[a-zA-Z]{50,}/g, '');
+  // 1. Basic cleanup - normalize whitespace but preserve structure
+  cleaned = cleaned.replace(/\r\n/g, '\n');
+  cleaned = cleaned.replace(/\t/g, ' ');
+  
+  // Remove control characters but keep CJK
   cleaned = cleaned.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+  cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF]/g, '');
   
-  const frontMatterPatterns = [
-    /目\s*录[\s\S]*/i,
-    /前\s*言[\s\S]*/i,
-    /序\s*言[\s\S]*/i,
-    /导\s*读[\s\S]*/i,
-    /编\s*者\s*按[\s\S]*/i,
-    /致\s*谢[\s\S]*/i,
-    /后\s*记[\s\S]*/i,
-    /出版说明[\s\S]*/i,
-    /修订说明[\s\S]*/i,
-    /编写说明[\s\S]*/i,
-    /使用说明[\s\S]*/i,
-    /配套资源说明[\s\S]*/i,
-  ];
+  // 2. Remove noise patterns that are definitely not content
+  // Remove URLs
+  cleaned = cleaned.replace(/https?:\/\/[^\s\n]{5,}/gi, '');
   
-  for (const pattern of frontMatterPatterns) {
-    cleaned = cleaned.replace(pattern, '\n\n');
-  }
-  
-  cleaned = cleaned.replace(/\n\d+\s*/g, '\n');
-  cleaned = cleaned.replace(/\s*\d+$/gm, '');
-  cleaned = cleaned.replace(/^(第\s*[\d一二三四五六七八九十]+\s*[章篇部节])\s*.+\s*\1/gi, '$1');
-  cleaned = cleaned.replace(/(上一页|下一页|上一节|下一节|返回目录|点击这里).{0,20}/gi, '');
-  cleaned = cleaned.replace(/https?:\/\/[^\s]+/gi, '');
+  // Remove email addresses
   cleaned = cleaned.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '');
-  cleaned = cleaned.replace(/©\s*\d{4}.{0,50}/gi, '');
-  cleaned = cleaned.replace(/版\s*权[\s\S]*/i, '');
-  cleaned = cleaned.replace(/ISBN[\s\S]*/i, '');
-  cleaned = cleaned.replace(/出版[社书刊]?:[\s\S]*/i, '');
-  cleaned = cleaned.replace(/印刷[厂次]:[\s\S]*/i, '');
-  cleaned = cleaned.replace(/字数:\s*\d+[千万]?/gi, '');
   
+  // Remove page numbers (standalone numbers at start/end of lines)
+  cleaned = cleaned.replace(/\n\s*\d+\s*\n/g, '\n\n');
+  cleaned = cleaned.replace(/\n\s*第\s*\d+\s*页\s*\n/gi, '\n\n');
+  cleaned = cleaned.replace(/\n\s*Page\s*\d+\s*/gi, '\n\n');
+  
+  // 3. Remove very short lines that are likely page markers
   const lines = cleaned.split('\n');
   const cleanedLines = lines.filter(line => {
-    if (line.trim().length < 5 && line.trim().length > 0) return false;
-    if (/^[\d\s.。,，、]+$/.test(line.trim())) return false;
+    const trimmed = line.trim();
+    // Skip completely empty lines
+    if (trimmed.length === 0) return true;
+    // Skip lines that are just numbers or symbols
+    if (/^[\d\s.。,，、;；:：]+$/.test(trimmed)) return false;
+    // Skip very short lines unless they look like actual content
+    if (trimmed.length < 10 && !/[的一是不了在和人中有]/.test(trimmed)) return false;
     return true;
   });
   cleaned = cleanedLines.join('\n');
+  
+  // 4. Normalize excessive whitespace
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');
   cleaned = cleaned.trim();
+  
   removedCount = originalLength - cleaned.length;
   
   return { cleaned, removedCount };
@@ -160,6 +186,8 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editableText, setEditableText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load books from localStorage on mount
@@ -759,13 +787,24 @@ export default function Home() {
                       <label className="text-sm font-medium text-slate-400">
                         📖 PDF 内容预览（已自动提取并清洗）
                       </label>
-                      <span className="text-xs text-slate-500">
-                        {extractedPdfText.length.toLocaleString()} 字
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditableText(extractedPdfText);
+                            setShowEditModal(true);
+                          }}
+                          className="px-3 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all"
+                        >
+                          ✏️ 编辑内容
+                        </button>
+                        <span className="text-xs text-slate-500">
+                          {extractedPdfText.length.toLocaleString()} 字
+                        </span>
+                      </div>
                     </div>
                     <div className="p-3 bg-slate-900/50 rounded-xl text-sm text-slate-400 max-h-32 overflow-y-auto">
-                      {extractedPdfText.slice(0, 1000)}
-                      {extractedPdfText.length > 1000 && '...'}
+                      {extractedPdfText.slice(0, 1500)}
+                      {extractedPdfText.length > 1500 && '...'}
                     </div>
                   </div>
                 )}
@@ -999,6 +1038,55 @@ export default function Home() {
       {/* Confetti overlay */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none" />
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">✏️ 编辑 PDF 内容</h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-slate-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-slate-400 text-sm mb-4">
+              如果 PDF 提取的内容不准确，可以在这里手动删除不需要的部分，保留核心知识内容
+            </p>
+            <textarea
+              value={editableText}
+              onChange={(e) => setEditableText(e.target.value)}
+              className="flex-1 w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
+              placeholder="编辑内容..."
+            />
+            <div className="flex justify-between items-center mt-4">
+              <span className="text-sm text-slate-500">
+                {editableText.length.toLocaleString()} 字
+              </span>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-6 py-2 bg-slate-700 rounded-xl hover:bg-slate-600 transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setExtractedPdfText(editableText);
+                    setInputText(editableText);
+                    setShowEditModal(false);
+                  }}
+                  className="px-6 py-2 bg-cyan-500 rounded-xl hover:bg-cyan-600 transition-all"
+                >
+                  保存并继续
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
