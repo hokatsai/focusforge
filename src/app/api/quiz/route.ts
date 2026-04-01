@@ -1,24 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+type QuizRequestBody = {
+  question?: string;
+  options?: string[];
+  userAnswerIndex?: number;
+  correctAnswerIndex?: number;
+  explanation?: string;
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const { 
-      questionId, 
+    let body: QuizRequestBody = {};
+    try {
+      body = (await request.json()) as QuizRequestBody;
+    } catch {
+      body = {};
+    }
+
+    const {
       question, 
       options, 
       userAnswerIndex, 
       correctAnswerIndex,
       explanation: providedExplanation 
-    } = await request.json();
+    } = body;
 
-    // Fallback if not enough data
-    if (typeof userAnswerIndex !== 'number' || typeof correctAnswerIndex !== 'number') {
-      return NextResponse.json({ error: 'Missing answer data' }, { status: 400 });
-    }
+    const normalizedUserAnswerIndex = Number.isFinite(userAnswerIndex) ? Number(userAnswerIndex) : 0;
+    const normalizedCorrectAnswerIndex = Number.isFinite(correctAnswerIndex) ? Number(correctAnswerIndex) : 0;
 
-    const isCorrect = userAnswerIndex === correctAnswerIndex;
-    const userAnswer = options?.[userAnswerIndex] || '';
-    const correctAnswer = options?.[correctAnswerIndex] || '';
+    const isCorrect = normalizedUserAnswerIndex === normalizedCorrectAnswerIndex;
+    const userAnswer = options?.[normalizedUserAnswerIndex] || '';
+    const correctAnswer = options?.[normalizedCorrectAnswerIndex] || '';
 
     // Try MiniMax for smart feedback
     const miniMaxApiKey = process.env.MINIMAX_API_KEY;
@@ -45,8 +57,8 @@ export async function POST(request: NextRequest) {
                 role: 'user', 
                 content: `题目：${question}
 选项：${options?.map((o: string, i: number) => `${String.fromCharCode(65+i)}. ${o}`).join(' | ')}
-用户选择：${userAnswerIndex} - ${userAnswer}
-正确答案：${correctAnswerIndex} - ${correctAnswer}
+用户选择：${normalizedUserAnswerIndex} - ${userAnswer}
+正确答案：${normalizedCorrectAnswerIndex} - ${correctAnswer}
 ${isCorrect ? '答对了，简单解释为什么对。' : '答错了，给出苏格拉底式引导。'}`
               }
             ],
@@ -97,15 +109,20 @@ ${isCorrect ? '答对了，简单解释为什么对。' : '答错了，给出苏
 
     return NextResponse.json({
       correct: false,
-      explanation: `你的选择是 ${String.fromCharCode(65 + userAnswerIndex)}，正确答案是 ${String.fromCharCode(65 + correctAnswerIndex)}。
+      explanation: providedExplanation || `你的选择是 ${String.fromCharCode(65 + normalizedUserAnswerIndex)}，正确答案是 ${String.fromCharCode(65 + normalizedCorrectAnswerIndex)}。
 
-关键在于理解为什么 ${String.fromCharCode(65 + correctAnswerIndex)} 是对的。`,
-      hint: wrongHints[userAnswerIndex] || '再想想题目在问什么...',
+关键在于理解为什么 ${String.fromCharCode(65 + normalizedCorrectAnswerIndex)} 是对的。`,
+      hint: wrongHints[normalizedUserAnswerIndex] || '再想想题目在问什么...',
       thinking: '可能混淆了相似概念，建议回到相关章节复习。'
     });
 
   } catch (error) {
     console.error('Quiz API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({
+      correct: false,
+      explanation: '先复盘题干和每个选项的关键差异，再试一次。',
+      hint: '先排除最明显错误的两个选项，再比较剩余选项的定义边界。',
+      thinking: '你可能是在相似概念之间做了过快匹配。'
+    });
   }
 }

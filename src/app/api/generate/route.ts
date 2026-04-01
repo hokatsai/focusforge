@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+type GenerateRequestBody = {
+  text?: string;
+};
+
 const SYSTEM_PROMPT = `你是一个专业的教材学习规划师。分析提供的教材内容，生成一个全面的学习指南。
 
 **重要规则：**
@@ -45,21 +49,28 @@ const SYSTEM_PROMPT = `你是一个专业的教材学习规划师。分析提供
 }`;
 
 export async function POST(request: NextRequest) {
-  try {
-    const { text } = await request.json();
+  let fallbackText = '通用学习内容';
 
-    if (!text || typeof text !== 'string') {
-      return NextResponse.json({ error: 'Text is required' }, { status: 400 });
+  try {
+    let body: GenerateRequestBody = {};
+    try {
+      body = (await request.json()) as GenerateRequestBody;
+    } catch {
+      body = {};
     }
 
+    const rawText = typeof body?.text === 'string' ? body.text : '';
+    const safeText = rawText || fallbackText;
+
     // Clean and truncate text - keep enough for meaningful analysis
-    const cleanedText = text.replace(/\r\n/g, '\n').replace(/\t/g, ' ').trim();
+    const cleanedText = safeText.replace(/\r\n/g, '\n').replace(/\t/g, ' ').trim();
     const truncatedText = cleanedText.slice(0, 50000); // 50k chars limit for API
+    fallbackText = truncatedText || fallbackText;
 
     const miniMaxApiKey = process.env.MINIMAX_API_KEY;
 
     if (!miniMaxApiKey) {
-      return NextResponse.json(getMockGuide(truncatedText));
+      return NextResponse.json(getMockGuide(fallbackText));
     }
 
     try {
@@ -81,14 +92,14 @@ export async function POST(request: NextRequest) {
       });
 
       if (!response.ok) {
-        throw new Error('API request failed');
+        return NextResponse.json(getMockGuide(fallbackText));
       }
 
       const data = await response.json();
       let content = data.choices?.[0]?.message?.content;
 
       if (!content) {
-        return NextResponse.json(getMockGuide(truncatedText));
+        return NextResponse.json(getMockGuide(fallbackText));
       }
 
       content = content.trim();
@@ -101,16 +112,16 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
       console.error('API error:', error);
-      return NextResponse.json(getMockGuide(truncatedText));
+      return NextResponse.json(getMockGuide(fallbackText));
     }
 
   } catch (error) {
     console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(getMockGuide(fallbackText));
   }
 }
 
-function getMockGuide(text: string): any {
+function getMockGuide(text: string) {
   // Extract a topic from the text
   const firstLine = text.split('\n')[0]?.slice(0, 50) || '学习内容';
   const topic = firstLine.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
