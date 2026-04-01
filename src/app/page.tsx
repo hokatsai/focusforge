@@ -243,7 +243,6 @@ export default function Home() {
       });
       const data = await res.json();
       setQuizFeedback(data);
-      if (isCorrect) triggerConfetti();
     } catch {
       setQuizFeedback({
         correct: isCorrect,
