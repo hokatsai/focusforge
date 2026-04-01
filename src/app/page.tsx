@@ -148,9 +148,14 @@ export default function Home() {
   
   // Demo flow state
   const [demoStarted, setDemoStarted] = useState(false);
-  const [demoStep, setDemoStep] = useState(0); // 0:input 1:concepts 2:quiz 3:result
+  const [demoStep, setDemoStep] = useState(0); // 0:input 1:concepts 2:timer 3:quiz
   const [quizAnswers, setQuizAnswers] = useState<QuizAnswer[]>([]);
   const [quizFeedback, setQuizFeedback] = useState<QuizFeedback | null>(null);
+  
+  // Timer state
+  const [timerStatus, setTimerStatus] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [timerElapsed, setTimerElapsed] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -158,6 +163,33 @@ export default function Home() {
     const saved = localStorage.getItem('ff_books');
     if (saved) setBooks(JSON.parse(saved));
   }, []);
+
+  // Timer effect
+  useEffect(() => {
+    if (timerStatus === 'running') {
+      timerRef.current = setInterval(() => {
+        setTimerElapsed(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timerStatus]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const startTimer = () => setTimerStatus('running');
+  const pauseTimer = () => setTimerStatus('paused');
+  const resetTimer = () => { setTimerElapsed(0); setTimerStatus('idle'); };
 
   const saveBooks = (updated: Book[]) => {
     setBooks(updated);
@@ -172,6 +204,7 @@ export default function Home() {
     setDemoStep(0);
     setQuizAnswers([]);
     setQuizFeedback(null);
+    resetTimer();
   };
 
   const submitDemoInput = () => {
@@ -184,9 +217,10 @@ export default function Home() {
   };
 
   const startDemoQuiz = () => {
-    setDemoStep(2);
+    setDemoStep(3); // Go to timer first
     setQuizAnswers([]);
     setQuizFeedback(null);
+    resetTimer();
   };
 
   const submitQuizAnswer = async (selected: number) => {
@@ -209,6 +243,7 @@ export default function Home() {
       });
       const data = await res.json();
       setQuizFeedback(data);
+      if (isCorrect) triggerConfetti();
     } catch {
       setQuizFeedback({
         correct: isCorrect,
@@ -435,21 +470,60 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
-                    <button onClick={startDemoQuiz} className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium mt-4 hover:bg-gray-800 transition">
-                      📝 開始答題練習
+                    <button onClick={startDemoQuiz} className="w-full py-3 bg-purple-500 text-white rounded-xl font-medium mt-4 hover:bg-purple-600 transition">
+                      ⏱️ 開始計時練習
                     </button>
                   </div>
                 )}
 
-                {/* Step 2: Quiz */}
+                {/* Step 2: Timer */}
                 {demoStep === 2 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-gray-900">⏱️ 專注計時器</h3>
+                    <div className="bg-gray-50 rounded-xl p-6 text-center">
+                      <div className="text-5xl font-mono font-bold text-gray-900 mb-4">
+                        {formatTime(timerElapsed)}
+                      </div>
+                      <div className="flex justify-center gap-3">
+                        {timerStatus === 'idle' && (
+                          <button onClick={startTimer} className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+                            ▶ 開始
+                          </button>
+                        )}
+                        {timerStatus === 'running' && (
+                          <button onClick={pauseTimer} className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">
+                            ⏸ 暫停
+                          </button>
+                        )}
+                        {timerStatus === 'paused' && (
+                          <button onClick={startTimer} className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition">
+                            ▶ 繼續
+                          </button>
+                        )}
+                        <button onClick={resetTimer} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition">
+                          🔄 重置
+                        </button>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => { pauseTimer(); setDemoStep(3); }} 
+                      className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition"
+                    >
+                      📝 完成計時，開始答題
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 3: Quiz */}
+                {demoStep === 3 && (
                   <div className="space-y-3">
                     <h3 className="font-semibold text-gray-900">📝 測驗</h3>
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="font-medium text-gray-900 mb-3">關鍵路徑是指什麼？</p>
                       {['項目中最長的活動序列', '最短的活動序列', '任意一條路徑', '成本最低的路徑'].map((opt, i) => {
-                        const answered = quizAnswers.length > 0;
-                        const isSelected = quizAnswers[0]?.selected === i;
+                        const lastAnswer = quizAnswers[quizAnswers.length - 1];
+                        const answered = !!lastAnswer;
+                        const isSelected = lastAnswer?.selected === i;
                         const isCorrect = i === 0;
                         let bgClass = 'bg-white border border-gray-200 hover:border-gray-300';
                         if (answered) {
@@ -481,9 +555,29 @@ export default function Home() {
                     )}
 
                     {quizAnswers.length > 0 && (
-                      <button onClick={finishDemo} className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl mt-4 hover:bg-gray-200 transition">
-                        {quizAnswers[0].correct ? '🎉 完成 Demo' : '🔄 重新嘗試'}
-                      </button>
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={finishDemo} 
+                          className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
+                        >
+                          結束 Demo
+                        </button>
+                        {quizAnswers[quizAnswers.length - 1].correct ? (
+                          <button 
+                            onClick={() => { setDemoStarted(false); setDemoStep(0); setQuizAnswers([]); setQuizFeedback(null); }} 
+                            className="flex-1 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition"
+                          >
+                            🚀 開始真實學習
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => { setQuizAnswers([]); setQuizFeedback(null); }} 
+                            className="flex-1 py-3 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 transition"
+                          >
+                            🔄 再試一次
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
