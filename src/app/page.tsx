@@ -885,26 +885,108 @@ export default function Home() {
           </div>
         )}
 
-        {/* Concepts Step */}
+        {/* Concepts Step - Learning Guide */}
         {step === 'concepts' && learningData && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-center mb-6">📖 概念拆解</h2>
-            <div className="grid gap-4">
-              {learningData.concepts.map((concept, index) => (
-                <details key={index} className="bg-slate-800/50 rounded-xl backdrop-blur-sm group">
-                  <summary className="p-4 cursor-pointer list-none flex items-center justify-between">
-                    <span className="font-medium text-lg">
-                      <span className="text-cyan-400 mr-2">{index + 1}.</span>
-                      {concept.title}
-                    </span>
-                    <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <div className="px-4 pb-4 text-slate-300 border-t border-slate-700 pt-2">
-                    {concept.description}
+            {/* Learning Guide Header */}
+            {learningData.learningGuide && (
+              <>
+                <div className="bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-2xl p-6 border border-cyan-500/30">
+                  <h2 className="text-2xl font-bold mb-2">📚 {learningData.learningGuide.title}</h2>
+                  <p className="text-slate-300">{learningData.learningGuide.overview}</p>
+                </div>
+
+                {/* Learning Stages */}
+                {learningData.learningGuide.stages && learningData.learningGuide.stages.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      🗺️ 学习路径
+                    </h3>
+                    {learningData.learningGuide.stages.map((stage: any, index: number) => (
+                      <div key={index} className={`rounded-xl p-5 border ${
+                        stage.priority === 'high' ? 'bg-red-500/10 border-red-500/30' :
+                        stage.priority === 'medium' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                        'bg-slate-800/50 border-slate-700'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          <span className={`text-2xl ${
+                            stage.priority === 'high' ? '🔴' : stage.priority === 'medium' ? '🟡' : '⚪'
+                          }`}>{index + 1}</span>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-lg mb-1">{stage.stage}</h4>
+                            <p className="text-cyan-400 text-sm mb-2">目标：{stage.goal}</p>
+                            {stage.keyPoints && stage.keyPoints.length > 0 && (
+                              <div className="mb-2">
+                                <span className="text-slate-400 text-sm">重点：</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {stage.keyPoints.map((point: string, i: number) => (
+                                    <span key={i} className="px-2 py-1 bg-slate-700/50 rounded text-sm text-slate-300">
+                                      {point}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {stage.recommendations && (
+                              <p className="text-slate-400 text-sm italic mt-2">
+                                💡 {stage.recommendations}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </details>
-              ))}
-            </div>
+                )}
+
+                {/* Core Knowledge */}
+                {learningData.learningGuide.coreKnowledge && learningData.learningGuide.coreKnowledge.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                      📖 核心知识点
+                    </h3>
+                    <div className="grid gap-3">
+                      {learningData.learningGuide.coreKnowledge.map((knowledge: any, index: number) => (
+                        <details key={index} className="bg-slate-800/50 rounded-xl backdrop-blur-sm group">
+                          <summary className="p-4 cursor-pointer list-none flex items-center justify-between">
+                            <span className="font-medium flex items-center gap-2">
+                              <span className="text-cyan-400">{index + 1}.</span>
+                              {knowledge.title}
+                              {knowledge.importance && (
+                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                  knowledge.importance === '必会' ? 'bg-red-500/30 text-red-400' :
+                                  knowledge.importance === '重要' ? 'bg-yellow-500/30 text-yellow-400' :
+                                  'bg-slate-600/50 text-slate-400'
+                                }`}>
+                                  {knowledge.importance}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                          </summary>
+                          <div className="px-4 pb-4 text-slate-300 border-t border-slate-700 pt-2">
+                            {knowledge.description}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Study Tips */}
+                {learningData.learningGuide.studyTips && learningData.learningGuide.studyTips.length > 0 && (
+                  <div className="bg-purple-500/10 rounded-xl p-4 border border-purple-500/30">
+                    <h3 className="font-bold mb-2">💡 学习建议</h3>
+                    <ul className="space-y-1">
+                      {learningData.learningGuide.studyTips.map((tip: string, index: number) => (
+                        <li key={index} className="text-slate-300 text-sm">• {tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+
             <div className="text-center mt-8">
               <button
                 onClick={() => setStep('quiz')}

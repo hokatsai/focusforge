@@ -1,45 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_PROMPT = `你是一个专业的教材学习专家。你的任务是从教材内容中提取核心知识点，并创建有效的测验题来验证学习效果。
+const SYSTEM_PROMPT = `你是一个专业的教材学习规划师。你的任务是对提供的教材内容进行深度分析，提取核心知识点，并生成一个结构化的学习路径。
 
-请仔细阅读以下教材内容，提取其中最重要的概念和知识点。
+**输出格式要求：**
 
-**重要原则：**
-1. 只提取教材中明确提到的核心概念和知识点
-2. 不要添加教材中没有的内容
-3. 优先提取定义、原理、公式、重要结论等关键内容
-4. 忽略目录、页眉页脚、出版信息等非知识内容
+请严格按照以下JSON格式输出，不要Markdown代码块，只要纯JSON：
 
-必须只返回JSON格式，不要Markdown，不要解释，不要代码块，只要纯JSON。
-
-JSON格式必须严格遵循这个结构：
 {
-  "concepts": [
-    {
-      "title": "核心概念标题（中文）",
-      "description": "详细解释这个概念的含义、原理和应用，3-5句话"
-    }
-  ],
+  "learningGuide": {
+    "title": "学习指南标题（基于教材内容生成）",
+    "overview": "对这份教材的整体概述，2-3句话说明这是什么内容、有什么特点",
+    "stages": [
+      {
+        "stage": "第一阶段：阶段名称",
+        "goal": "阶段学习目标",
+        "priority": "high/medium/low",
+        "keyPoints": ["重点1", "重点2", "重点3"],
+        "recommendations": "具体行动建议"
+      }
+    ],
+    "coreKnowledge": [
+      {
+        "title": "核心知识点标题",
+        "description": "详细解释这个知识点，3-5句话",
+        "importance": "必会|重要|了解"
+      }
+    ],
+    "studyTips": ["学习技巧1", "学习技巧2", "学习技巧3"]
+  },
   "quizzes": [
     {
       "id": "q1",
-      "question": "测验问题（中文）",
+      "question": "测验问题（测试对核心内容的理解）",
       "options": ["选项A", "选项B", "选项C", "选项D"],
       "correctAnswerIndex": 0
     }
   ]
 }
 
-规则：
-- 生成5-8个核心概念（越多越好，覆盖教材主要内容）
-- 生成3道测验题（id分别是q1, q2, q3）
-- 每道测验必须有4个选项
-- correctAnswerIndex必须是0-3之间的数字
-- 所有文本使用中文
-- 测验应该测试对概念的实际理解，而不是死记硬背
-- 只返回JSON，不要其他任何内容`;
+**重要规则：**
 
-// Split text into chunks of approximately maxChunkSize characters
+1. **学习阶段（stages）**：
+   - 根据教材内容划分2-4个学习阶段
+   - 每个阶段要有明确的学习目标和行动建议
+   - 标注优先级（high/medium/low）
+   - 包含具体的重点知识点列表
+
+2. **核心知识（coreKnowledge）**：
+   - 提取教材中最重要的5-10个核心知识点
+   - 每个知识点要有详细的解释
+   - 标注重要性等级
+
+3. **测验题（quizzes）**：
+   - 生成3-5道测验题
+   - 题目要测试对核心内容的理解和应用
+   - 不要考死记硬背，要考理解
+
+4. **输出要求**：
+   - 所有文本使用中文
+   - JSON格式要严格正确，可以被解析
+   - 只返回JSON，不要任何其他内容`;
+
+// Split text into chunks
 function splitTextIntoChunks(text: string, maxChunkSize: number = 150000): string[] {
   if (text.length <= maxChunkSize) {
     return [text];
@@ -51,25 +73,18 @@ function splitTextIntoChunks(text: string, maxChunkSize: number = 150000): strin
   while (currentPos < text.length) {
     let endPos = Math.min(currentPos + maxChunkSize, text.length);
     
-    // Try to break at a sentence or paragraph boundary
     if (endPos < text.length) {
-      // Look for paragraph break first (\n\n), then sentence break (。！？)
       const searchStart = endPos;
-      const searchEnd = Math.min(endPos + 1000, text.length);
       
-      // Try to find a paragraph break
       let breakPos = text.lastIndexOf('\n\n', searchStart);
       if (breakPos > currentPos + maxChunkSize / 2) {
         endPos = breakPos + 2;
       } else {
-        // Try sentence breaks
         const sentenceBreaks = ['。', '！', '？', '.\n', '!\n', '?\n'];
-        let foundBreak = false;
         for (const sep of sentenceBreaks) {
           breakPos = text.lastIndexOf(sep, searchStart);
           if (breakPos > currentPos + maxChunkSize / 3) {
             endPos = breakPos + sep.length;
-            foundBreak = true;
             break;
           }
         }
@@ -102,151 +117,81 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Hard limit to prevent abuse
     if (trimmedText.length > 250000) {
       return NextResponse.json(
-        { error: 'Text exceeds 200,000 character limit. Please summarize or split the content.' },
+        { error: 'Text exceeds 250,000 character limit' },
         { status: 400 }
       );
     }
 
-    // Check for API keys
     const miniMaxApiKey = process.env.MINIMAX_API_KEY;
-    const geminiApiKey = process.env.GEMINI_API_KEY;
     
-    // Split text into chunks if needed
+    if (!miniMaxApiKey) {
+      return getMockResponse(trimmedText);
+    }
+
     const chunks = splitTextIntoChunks(trimmedText);
-    const isChunked = chunks.length > 1;
+    const results: any[] = [];
     
-    // Use MiniMax if available
-    if (miniMaxApiKey) {
-      const results = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
+      try {
+        const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${miniMaxApiKey}`
+          },
+          body: JSON.stringify({
+            model: 'MiniMax-M2.7',
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'user', content: `请分析以下教材内容，生成结构化的学习指南：\n\n${chunk}` }
+            ],
+            temperature: 0.5,
+            max_tokens: 4000
+          })
+        });
+
+        if (!response.ok) {
+          console.error('MiniMax API error:', await response.text());
+          continue;
+        }
+
+        const data = await response.json();
+        let content = data.choices?.[0]?.message?.content;
         
-        try {
-          const miniMaxResponse = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${miniMaxApiKey}`
-            },
-            body: JSON.stringify({
-              model: 'MiniMax-M2.7',
-              messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: `学习内容 (第${i + 1}/${chunks.length}部分): ${chunk}` }
-              ],
-              temperature: 0.3,
-              max_tokens: 2500
-            })
-          });
-
-          if (!miniMaxResponse.ok) {
-            console.error('MiniMax API error:', await miniMaxResponse.text());
-            continue;
+        if (content) {
+          content = content.trim();
+          if (content.startsWith('```')) {
+            content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
           }
-
-          const data = await miniMaxResponse.json();
-          let content = data.choices?.[0]?.message?.content;
           
-          if (content && content.trim()) {
-            content = content.trim();
-            if (content.startsWith('```')) {
-              content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-            }
-            
-            try {
-              const parsed = JSON.parse(content);
-              results.push(parsed);
-            } catch {
-              // Try to extract JSON
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                try {
-                  results.push(JSON.parse(jsonMatch[0]));
-                } catch {
-                  // Skip this chunk
-                }
+          try {
+            const parsed = JSON.parse(content);
+            results.push(parsed);
+          } catch {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                results.push(JSON.parse(jsonMatch[0]));
+              } catch {
+                // Skip
               }
             }
           }
-        } catch (error) {
-          console.error(`Error processing chunk ${i + 1}:`, error);
         }
-      }
-      
-      if (results.length > 0) {
-        // Merge results from all chunks
-        const merged = mergeResults(results);
-        if (merged.concepts && merged.concepts.length > 0) {
-          return NextResponse.json(merged);
-        }
+      } catch (error) {
+        console.error(`Error processing chunk ${i + 1}:`, error);
       }
     }
     
-    // Use Gemini if available
-    if (geminiApiKey) {
-      const results = [];
-      
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        
-        try {
-          const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: `System: ${SYSTEM_PROMPT}\n\nUser: 学习内容 (第${i + 1}/${chunks.length}部分): ${chunk}` }] }],
-                generationConfig: { temperature: 0.3, maxOutputTokens: 2500 }
-              })
-            }
-          );
-
-          if (!geminiResponse.ok) {
-            console.error('Gemini API error:', await geminiResponse.text());
-            continue;
-          }
-
-          const data = await geminiResponse.json();
-          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          
-          if (content) {
-            let cleanContent = content.trim();
-            if (cleanContent.startsWith('```')) {
-              cleanContent = cleanContent.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-            }
-            
-            try {
-              results.push(JSON.parse(cleanContent));
-            } catch {
-              const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                try {
-                  results.push(JSON.parse(jsonMatch[0]));
-                } catch {
-                  // Skip
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing chunk ${i + 1}:`, error);
-        }
-      }
-      
-      if (results.length > 0) {
-        const merged = mergeResults(results);
-        if (merged.concepts && merged.concepts.length > 0) {
-          return NextResponse.json(merged);
-        }
-      }
+    if (results.length > 0) {
+      const merged = mergeResults(results);
+      return NextResponse.json(merged);
     }
 
-    // Fallback: generate mock data
     return getMockResponse(trimmedText);
 
   } catch (error) {
@@ -263,73 +208,90 @@ function mergeResults(results: any[]): any {
     return results[0];
   }
   
-  // Merge concepts from all chunks
-  const allConcepts: any[] = [];
+  // Merge learning guides from all chunks
+  const allStages: any[] = [];
+  const allCoreKnowledge: any[] = [];
   const allQuizzes: any[] = [];
   
   for (const result of results) {
-    if (result.concepts) {
-      allConcepts.push(...result.concepts);
+    if (result.learningGuide?.stages) {
+      allStages.push(...result.learningGuide.stages);
+    }
+    if (result.learningGuide?.coreKnowledge) {
+      allCoreKnowledge.push(...result.learningGuide.coreKnowledge);
     }
     if (result.quizzes) {
       allQuizzes.push(...result.quizzes);
     }
   }
   
-  // Dedupe and limit concepts
+  // Dedupe and limit
   const seenTitles = new Set<string>();
-  const uniqueConcepts = allConcepts.filter((c: any) => {
-    if (seenTitles.has(c.title)) return false;
-    seenTitles.add(c.title);
+  const uniqueKnowledge = allCoreKnowledge.filter((k: any) => {
+    if (seenTitles.has(k.title)) return false;
+    seenTitles.add(k.title);
     return true;
-  }).slice(0, 5);
+  }).slice(0, 10);
   
-  // Take quizzes from first result only (to avoid duplication)
-  const quizzes = results[0]?.quizzes?.slice(0, 3) || [
-    {
-      id: "q1",
-      question: "关于学习内容的理解测验",
-      options: ["正确", "错误", "不确定", "以上都不对"],
-      correctAnswerIndex: 0
-    }
-  ];
+  // Limit stages to 4
+  const uniqueStages = allStages.slice(0, 4);
   
-  return { concepts: uniqueConcepts, quizzes };
+  // Limit quizzes to 5
+  const quizzes = allQuizzes.slice(0, 5);
+  
+  const mergedGuide = results[0]?.learningGuide || {};
+  
+  return {
+    learningGuide: {
+      title: mergedGuide.title || '学习指南',
+      overview: mergedGuide.overview || '基于提供的内容生成的学习指南',
+      stages: uniqueStages,
+      coreKnowledge: uniqueKnowledge,
+      studyTips: mergedGuide.studyTips || ['深入理解核心概念', '多做练习题', '及时复习巩固']
+    },
+    quizzes
+  };
 }
 
 function getMockResponse(text: string): any {
   return {
-    concepts: [
-      {
-        title: "基础概念",
-        description: `${text.slice(0, 30)}... 的核心基础概念是这个学习内容的第一块基石。理解这个概念将为后续深入学习打下坚实基础。`
-      },
-      {
-        title: "核心原理",
-        description: "这是理解整体知识体系的关键环节，连接了基础与进阶内容。"
-      },
-      {
-        title: "实践应用",
-        description: "将理论知识应用到实际场景中，加深理解和记忆。"
-      }
-    ],
+    learningGuide: {
+      title: "学习指南",
+      overview: `基于提供的内容生成的学习指南。内容涉及的主题可以帮助你系统性地学习相关知识。`,
+      stages: [
+        {
+          stage: "第一阶段：基础概念",
+          goal: "掌握核心理论基础",
+          priority: "high",
+          keyPoints: ["理解基本概念", "掌握核心原理", "建立知识框架"],
+          recommendations: "仔细阅读教材的基础章节，确保理解每个核心概念的定义和含义。"
+        },
+        {
+          stage: "第二阶段：深入学习",
+          goal: "深化理解与应用",
+          priority: "high",
+          keyPoints: ["应用所学知识", "解决实际问题", "形成知识体系"],
+          recommendations: "通过练习题和应用案例来加深对知识的理解。"
+        }
+      ],
+      coreKnowledge: [
+        {
+          title: "核心概念",
+          description: "这是本内容的核心基础概念，理解这个概念对后续学习至关重要。",
+          importance: "必会"
+        }
+      ],
+      studyTips: [
+        "深入理解而非死记硬背",
+        "多做练习巩固知识",
+        "及时复习防止遗忘"
+      ]
+    },
     quizzes: [
       {
         id: "q1",
-        question: `关于 "${text.slice(0, 15)}..." 描述正确的是？`,
-        options: ["正确描述了核心概念", "描述不够准确", "完全错误", "与主题无关"],
-        correctAnswerIndex: 0
-      },
-      {
-        id: "q2",
-        question: "以下哪项最能概括这个主题的本质？",
-        options: ["理论与实践的结合", "纯粹的背诵记忆", "机械的重复练习", "被动的信息接收"],
-        correctAnswerIndex: 0
-      },
-      {
-        id: "q3",
-        question: "学习这个内容的最佳方式是什么？",
-        options: ["理解 + 应用", "单纯阅读", "死记硬背", "不做任何准备"],
+        question: "以下哪项最准确地描述了主要内容？",
+        options: ["正确描述", "部分正确", "错误描述", "无关内容"],
         correctAnswerIndex: 0
       }
     ]
