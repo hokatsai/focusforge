@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       try {
         const prompt = `用户答题反馈请求：
 题目：${question}
-选项：${options?.map((o, i) => `${String.fromCharCode(65+i)}. ${o}`).join(' | ')}
+选项：${options?.map((o: string, i: number) => `${String.fromCharCode(65+i)}. ${o}`).join(' | ')}
 用户选择：${userAnswerIndex} - ${userAnswer}
 正确答案：${correctAnswerIndex} - ${correctAnswer}
 ${context ? `学习上下文：${context}` : ''}

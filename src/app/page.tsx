@@ -68,7 +68,7 @@ async function extractTextFromPDF(file: File): Promise<string> {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     document.head.appendChild(script);
-    await new Promise<void>((r) => { script.onload = r; });
+    await new Promise<void>((resolve) => { script.onload = () => resolve(); });
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
   const data = await file.arrayBuffer();
@@ -519,7 +519,7 @@ export default function Home() {
               className={`border-2 border-dashed rounded-xl p-8 text-center transition ${isDragging ? 'border-cyan-500 bg-cyan-500/10' : 'border-slate-600'}`}
             >
               <input ref={fileRef} type="file" accept=".pdf" onChange={e => {
-                const f = e.target.files e.target.files?.[0]e.target.files?.[0] e.target.files[0];
+                const f = e.target.files?.[0];
                 if (f) {
                   setSelectedFile(f);
                   setExtracting(true);
