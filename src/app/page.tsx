@@ -494,6 +494,121 @@ export default function Home() {
 
   // Topic Search View
   if (view === 'topic') {
+    // Show report if search completed
+    if (step === 'report' && learningGuide) {
+      return (
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
+          <div className="max-w-3xl mx-auto">
+            <button onClick={() => { setView('home'); setStep('input'); setLearningGuide(null); }} className="text-gray-400 hover:text-gray-600 mb-4">
+              ← 返回首頁
+            </button>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 mb-6">
+              <h1 className="text-2xl font-bold mb-2">📚 {learningGuide.title}</h1>
+              <p className="text-gray-500">{learningGuide.overview}</p>
+            </div>
+
+            {/* Resources */}
+            {learningGuide.resources && (
+              <div className="space-y-4 mb-6">
+                {learningGuide.resources.textbooks && learningGuide.resources.textbooks.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-bold mb-3">📖 官方教材</h3>
+                    <div className="space-y-2">
+                      {learningGuide.resources.textbooks.map((r: any, i: number) => (
+                        <a key={i} href={r.url} target="_blank" className="block p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                          <div className="text-gray-900 font-medium">{r.title}</div>
+                          <div className="text-sm text-gray-500">{r.description} · {r.source}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {learningGuide.resources.pastPapers && learningGuide.resources.pastPapers.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-bold mb-3">📝 历年真题</h3>
+                    <div className="space-y-2">
+                      {learningGuide.resources.pastPapers.map((r: any, i: number) => (
+                        <a key={i} href={r.url} target="_blank" className="block p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                          <div className="text-gray-900 font-medium">{r.title}</div>
+                          <div className="text-sm text-gray-500">{r.description} · {r.year || r.source}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {learningGuide.resources.onlineCourses && learningGuide.resources.onlineCourses.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-bold mb-3">🎬 优质网课</h3>
+                    <div className="space-y-2">
+                      {learningGuide.resources.onlineCourses.map((r: any, i: number) => (
+                        <a key={i} href={r.url} target="_blank" className="block p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                          <div className="flex justify-between">
+                            <span className="text-gray-900 font-medium">{r.title}</span>
+                            {r.platform && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">{r.platform}</span>}
+                          </div>
+                          <div className="text-sm text-gray-500">{r.description}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {learningGuide.resources.studyNotes && learningGuide.resources.studyNotes.length > 0 && (
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3 className="font-bold mb-3">📚 学习笔记</h3>
+                    <div className="space-y-2">
+                      {learningGuide.resources.studyNotes.map((r: any, i: number) => (
+                        <a key={i} href={r.url} target="_blank" className="block p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                          <div className="text-gray-900 font-medium">{r.title}</div>
+                          <div className="text-sm text-gray-500">{r.description} · {r.author || r.source}</div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Study Plan */}
+            {learningGuide.studyPlan && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                <h3 className="font-bold mb-3">📅 学习计划</h3>
+                {learningGuide.studyPlan.duration && <p className="text-cyan-600 text-sm mb-2">{learningGuide.studyPlan.duration}</p>}
+                <div className="space-y-2">
+                  {learningGuide.studyPlan.stages?.map((s: any, i: number) => (
+                    <div key={i} className="p-3 bg-gray-50 rounded-xl">
+                      <div className="text-purple-600 font-medium">{s.stage}：{s.goal}</div>
+                      <div className="text-sm text-gray-500 mt-1">任务：{s.tasks?.join('、')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save to bookshelf */}
+            <button
+              onClick={() => {
+                const book: Book = {
+                  id: Date.now().toString(),
+                  name: learningGuide.title,
+                  topic: topicInput,
+                  createdAt: new Date().toISOString(),
+                  progress: 0,
+                  learningGuide
+                };
+                saveBooks([book, ...books]);
+                setView('bookshelf');
+              }}
+              className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium"
+            >
+              💾 保存到书架
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Topic input form
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-2xl mx-auto">
