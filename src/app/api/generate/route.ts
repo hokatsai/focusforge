@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Hard limit to prevent abuse
-    if (trimmedText.length > 200000) {
+    if (trimmedText.length > 250000) {
       return NextResponse.json(
         { error: 'Text exceeds 200,000 character limit. Please summarize or split the content.' },
         { status: 400 }

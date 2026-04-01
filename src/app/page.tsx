@@ -264,7 +264,7 @@ export default function Home() {
       
       setExtractedPdfText(cleanedText);
       if (cleanedText.length > 0) {
-        setInputText(cleanedText.slice(0, 200000));
+        setInputText(cleanedText.slice(0, 250000));
       }
     } catch (error) {
       console.error('PDF extraction failed:', error);
