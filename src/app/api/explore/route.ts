@@ -1,41 +1,159 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_PROMPT = `# Role
-你是一位資深的「知識獵人」與「學習路徑規劃師」。你擅長在海量的互聯網信息中，精準篩選出含金量最高、最適合自學者的學習資源，並將其結構化。
+// Tavily API key - better search results than DuckDuckGo
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY || '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';
 
-# Task
-根據用戶提供的【學習主題】，進行全網實時搜索，並整理出一份閉環式的學習資源清單。
+interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  relevanceScore: number;
+}
 
-# Search Strategy
-請針對以下四個維度進行深度搜索：
-1. **官方/權威教材**：尋找該領域公認的經典教材、官方大綱或 PDF 手冊。
-2. **歷年真題/模擬題**：尋找備考必備的真題集、刷題網站或 GitHub 上的題庫倉庫。
-3. **優質網課/影片**：優先搜索 Bilibili、YouTube 或 MOOC 上的高評分課程鏈接。
-4. **學霸筆記/精華總結**：尋找知乎專欄、CSDN 深度文章或 GitHub 上的 Awesome 資源列表。
+async function searchWithTavily(query: string, maxResults = 8): Promise<SearchResult[]> {
+  try {
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query,
+        max_results: maxResults,
+        include_answer: true,
+        include_domains: [
+          'ruankao.org.cn',      // 软考网
+          'gov.cn',              // 政府网站
+          'bilibili.com',        // B站
+          'youku.com',           // 优酷
+          'icourse163.org',      // 网易公开课
+          'csdn.net',            // CSDN
+          'cnblogs.com',         // 博客园
+          'github.com',          // GitHub
+          'educity.cn',          // 希赛网
+          'exam8.com',           // 考试吧
+        ]
+      })
+    });
 
-# Output Constraints (極其重要)
-1. **輸出格式**：必須僅輸出一個嚴格的 JSON 對象，不允許包含任何解釋性文字或 Markdown 標籤。
-2. **鏈接有效性**：請確保提供的 URL 是真實存在且與主題高度相關的。
-3. **語言要求**：搜索結果的標題和簡介請使用繁體中文（或根據資料原文顯示）。
+    if (!response.ok) {
+      throw new Error('Tavily API failed');
+    }
 
-# JSON Schema
-{
-  "topic": "學習主題名稱",
-  "learning_map": {
-    "textbooks": [
-      { "title": "教材名稱", "summary": "簡短描述該教材的權威性或特色", "url": "鏈接地址" }
-    ],
-    "exams": [
-      { "title": "題庫名稱", "summary": "描述題庫年份或覆蓋範圍", "url": "鏈接地址" }
-    ],
-    "courses": [
-      { "title": "課程標題", "platform": "平台名稱", "url": "鏈接地址" }
-    ],
-    "notes": [
-      { "title": "筆記標題", "author": "作者或來源", "url": "鏈接地址" }
-    ]
+    const data = await response.json();
+    
+    return (data.results || []).map((r: any) => ({
+      title: r.title || '',
+      url: r.url || '',
+      content: r.content || '',
+      relevanceScore: r.score || 0
+    }));
+  } catch (error) {
+    console.error('Tavily search error:', error);
+    return [];
   }
-}`;
+}
+
+async function validateUrl(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      redirect: 'follow'
+    });
+    
+    clearTimeout(timeout);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function buildLearningMap(results: SearchResult[], topic: string): any {
+  const textbooks: any[] = [];
+  const exams: any[] = [];
+  const courses: any[] = [];
+  const notes: any[] = [];
+  
+  const lowerTopic = topic.toLowerCase();
+  
+  for (const r of results) {
+    const title = r.title.toLowerCase();
+    const url = r.url.toLowerCase();
+    const content = r.content.toLowerCase();
+    
+    // Skip if no meaningful content
+    if (r.content.length < 20) continue;
+    
+    // Classify based on URL and content
+    if (
+      url.includes('ruankao') ||
+      url.includes('gov.cn') ||
+      url.includes('exam') ||
+      title.includes('教材') ||
+      title.includes('教程') ||
+      title.includes('大纲')
+    ) {
+      textbooks.push({
+        title: r.title,
+        summary: r.content.slice(0, 100),
+        url: r.url
+      });
+    } else if (
+      title.includes('真题') ||
+      title.includes('试题') ||
+      title.includes('考试') ||
+      url.includes('tiku') ||
+      url.includes('exam')
+    ) {
+      exams.push({
+        title: r.title,
+        summary: r.content.slice(0, 100),
+        url: r.url
+      });
+    } else if (
+      title.includes('视频') ||
+      title.includes('课程') ||
+      title.includes('教程') ||
+      url.includes('bilibili') ||
+      url.includes('youku') ||
+      url.includes('icourse') ||
+      url.includes('imooc')
+    ) {
+      courses.push({
+        title: r.title,
+        platform: url.includes('bilibili') ? 'B站' : 
+                  url.includes('youku') ? '优酷' : 
+                  url.includes('imooc') ? '慕课网' : '在线课程',
+        url: r.url
+      });
+    } else {
+      notes.push({
+        title: r.title,
+        author: '网络贡献',
+        url: r.url
+      });
+    }
+  }
+  
+  // If categories are empty, use top results
+  if (textbooks.length === 0 && results.length > 0) {
+    textbooks.push({
+      title: results[0].title,
+      summary: results[0].content.slice(0, 100),
+      url: results[0].url
+    });
+  }
+  
+  return {
+    textbooks: textbooks.slice(0, 5),
+    exams: exams.slice(0, 5),
+    courses: courses.slice(0, 5),
+    notes: notes.slice(0, 5)
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,111 +164,54 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmedTopic = topic.trim();
-    const miniMaxApiKey = process.env.MINIMAX_API_KEY;
+    
+    // Build optimized search queries for better relevance
+    const queries = [
+      `${trimmedTopic} 官方教材 2024`,
+      `${trimmedTopic} 历年真题 备考`,
+      `${trimmedTopic} 视频教程 学习`,
+      `${trimmedTopic} 学习笔记 总结`
+    ];
 
-    if (!miniMaxApiKey) {
-      return NextResponse.json(getMockResults(trimmedTopic));
-    }
+    // Search with Tavily (parallel)
+    const searchResults = await Promise.all(
+      queries.map(q => searchWithTavily(q, 5))
+    );
 
-    try {
-      // Try MiniMax with web search capability
-      const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${miniMaxApiKey}`
-        },
-        body: JSON.stringify({
-          model: 'MiniMax-M2.7',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `我想學習的主題是：${trimmedTopic}` }
-          ],
-          temperature: 0.3,
-          max_tokens: 4000
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-      let content = data.choices?.[0]?.message?.content;
-
-      if (!content) {
-        return NextResponse.json(getMockResults(trimmedTopic));
-      }
-
-      content = content.trim();
-      
-      // Remove markdown code blocks if present
-      if (content.startsWith('```')) {
-        content = content.replace(/^```json?\s*/i, '').replace(/\s*```$/, '');
-      }
-      
-      // Try to parse as JSON
-      try {
-        const result = JSON.parse(content);
-        return NextResponse.json(result);
-      } catch {
-        // If JSON parsing fails, try to extract JSON from the content
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            const result = JSON.parse(jsonMatch[0]);
-            return NextResponse.json(result);
-          } catch {
-            // Fall through to mock data
-          }
+    // Flatten and dedupe results
+    const allResults: SearchResult[] = [];
+    const seenUrls = new Set<string>();
+    
+    for (const results of searchResults) {
+      for (const r of results) {
+        if (r.url && !seenUrls.has(r.url) && r.relevanceScore > 0.5) {
+          seenUrls.add(r.url);
+          allResults.push(r);
         }
-        return NextResponse.json(getMockResults(trimmedTopic));
       }
-
-    } catch (error) {
-      console.error('Explore API error:', error);
-      return NextResponse.json(getMockResults(trimmedTopic));
     }
+
+    // Sort by relevance
+    allResults.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+    // Build learning map
+    const learningMap = buildLearningMap(allResults.slice(0, 15), trimmedTopic);
+
+    return NextResponse.json({
+      topic: trimmedTopic,
+      learning_map: learningMap,
+      meta: {
+        total_results: allResults.length,
+        search_time: new Date().toISOString()
+      }
+    });
 
   } catch (error) {
-    console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Explore API error:', error);
+    return NextResponse.json({ 
+      error: 'Search failed',
+      topic: '',
+      learning_map: { textbooks: [], exams: [], courses: [], notes: [] }
+    }, { status: 500 });
   }
-}
-
-function getMockResults(topic: string): any {
-  // Fallback mock data when API is unavailable
-  return {
-    topic,
-    learning_map: {
-      textbooks: [
-        { 
-          title: `${topic} 官方教程`, 
-          summary: '權威教材，涵蓋所有考點', 
-          url: 'https://www.ruankao.org.cn/book' 
-        }
-      ],
-      exams: [
-        { 
-          title: `${topic} 歷年真題`, 
-          summary: '2019-2024年真題彙總', 
-          url: 'https://www.ruankao.org.cn/zxtz' 
-        }
-      ],
-      courses: [
-        { 
-          title: `${topic} 精講課程`, 
-          platform: 'B站', 
-          url: 'https://www.bilibili.com' 
-        }
-      ],
-      notes: [
-        { 
-          title: `${topic} 學習筆記`, 
-          author: '社區貢獻', 
-          url: 'https://blog.csdn.net' 
-        }
-      ]
-    }
-  };
 }
