@@ -34,6 +34,8 @@ interface LearningGuide {
   studyTips?: string[];
   resources?: Resources;
   studyPlan?: StudyPlan;
+  practiceQuestions?: any[];
+  tableOfContents?: any[];
 }
 
 interface Book {
@@ -261,14 +263,16 @@ export default function Home() {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+    if (file && (file.type === 'application/pdf' || file.name.endsWith('.pdf'))) {
       setSelectedFile(file);
       setExtracting(true);
+      setError('');
       try {
         const text = await extractTextFromPDF(file);
         setExtractedText(cleanText(text));
-      } catch {
-        setError('PDF 提取失败');
+      } catch (err) {
+        setError('PDF 提取失败，请尝试粘贴文本');
+        console.error('PDF error:', err);
       }
       setExtracting(false);
     } else {
@@ -655,6 +659,104 @@ export default function Home() {
 
   // Learning/PDF View
   if (view === 'learning') {
+    // Show report if generation completed
+    if (step === 'report' && learningGuide) {
+      return (
+        <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
+          <div className="max-w-3xl mx-auto">
+            <button onClick={() => { setView('home'); setStep('input'); setLearningGuide(null); }} className="text-gray-400 hover:text-gray-600 mb-4">
+              ← 返回首頁
+            </button>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 mb-6">
+              <h1 className="text-2xl font-bold mb-2">📚 {learningGuide.title || '學習指南'}</h1>
+              <p className="text-gray-500">{learningGuide.overview || 'AI 分析生成的學習內容'}</p>
+            </div>
+
+            {/* Chapters */}
+            {learningGuide.chapters && learningGuide.chapters.length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                <h3 className="font-bold mb-3">🗺️ 知識框架</h3>
+                <div className="space-y-2">
+                  {learningGuide.chapters.map((ch: any, i: number) => (
+                    <div key={ch.id || i} className="p-3 bg-gray-50 rounded-xl">
+                      <h4 className="font-medium text-gray-900">{i + 1}. {ch.chapter}</h4>
+                      <p className="text-sm text-gray-500 mt-1">{ch.summary}</p>
+                      {ch.keyPoints && ch.keyPoints.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {ch.keyPoints.map((kp: string, j: number) => (
+                            <span key={j} className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded">{kp}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Study Plan */}
+            {learningGuide.studyPlan && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                <h3 className="font-bold mb-3">📅 學習計劃</h3>
+                {learningGuide.studyPlan.duration && <p className="text-cyan-600 text-sm mb-2">{learningGuide.studyPlan.duration}</p>}
+                <div className="space-y-2">
+                  {learningGuide.studyPlan.stages?.map((s: any, i: number) => (
+                    <div key={i} className="p-3 bg-gray-50 rounded-xl">
+                      <div className="text-purple-600 font-medium">{s.stage}：{s.goal}</div>
+                      <div className="text-sm text-gray-500 mt-1">任務：{s.tasks?.join('、')}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Practice Questions */}
+            {learningGuide.practiceQuestions && learningGuide.practiceQuestions.length > 0 && (
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+                <h3 className="font-bold mb-3">📝 練習題</h3>
+                <div className="space-y-4">
+                  {learningGuide.practiceQuestions.map((q: any, i: number) => (
+                    <div key={q.id || i} className="p-4 bg-gray-50 rounded-xl">
+                      <p className="font-medium text-gray-900 mb-2">{q.chapter} - {q.question}</p>
+                      <div className="space-y-1">
+                        {q.options?.map((opt: string, j: number) => (
+                          <div key={j} className="text-sm text-gray-600">
+                            {String.fromCharCode(65 + j)}. {opt}
+                            {j === q.correctAnswerIndex && <span className="text-green-500 ml-2">✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Save to bookshelf */}
+            <button
+              onClick={() => {
+                const book: Book = {
+                  id: Date.now().toString(),
+                  name: learningGuide.title || '未命名學習',
+                  topic: learningGuide.topic || '',
+                  createdAt: new Date().toISOString(),
+                  progress: 0,
+                  learningGuide
+                };
+                saveBooks([book, ...books]);
+                setView('bookshelf');
+              }}
+              className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium"
+            >
+              💾 保存到書架
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Learning input form
     return (
       <div className="min-h-screen bg-gray-50 text-gray-900 p-4">
         <div className="max-w-2xl mx-auto">
