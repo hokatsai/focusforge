@@ -299,63 +299,117 @@ export default function Home() {
   };
 
   // Home View with Demo
+  // Home View - Light Minimal Theme
   if (view === 'home') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="max-w-4xl mx-auto pt-8 px-4 text-center">
-          <h1 className="text-5xl font-bold mb-3 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+        <div className="max-w-3xl mx-auto pt-16 px-6 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight mb-3">
             FocusForge
           </h1>
-          <p className="text-slate-400 text-lg mb-2">
+          <p className="text-lg text-gray-500 mb-2">
             把時間投入轉化為真正的肌肉記憶
           </p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm text-gray-400">
             粘貼任何學習材料，開始刻意練習
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          {/* Demo Section */}
-          <div className="bg-slate-800/50 rounded-2xl p-6 mb-8 border border-cyan-500/20">
+        {/* Three Feature Cards */}
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="grid gap-4">
+            {/* Card 1: Smart Search */}
+            <button
+              onClick={() => setView('topic')}
+              className="group bg-white rounded-2xl p-6 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border border-gray-100"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">🔍</div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-1">智能搜索學習</h3>
+                  <p className="text-gray-500 text-sm">輸入主題，AI 主動搜集官方教材、真題、網課</p>
+                </div>
+                <div className="text-gray-300 group-hover:text-gray-400 transition-colors">→</div>
+              </div>
+            </button>
+
+            {/* Card 2: PDF Learning */}
+            <button
+              onClick={() => setView('learning')}
+              className="group bg-white rounded-2xl p-6 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border border-gray-100"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">📄</div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-1">PDF 學習</h3>
+                  <p className="text-gray-500 text-sm">上傳教材或粘貼內容，生成學習路徑</p>
+                </div>
+                <div className="text-gray-300 group-hover:text-gray-400 transition-colors">→</div>
+              </div>
+            </button>
+
+            {/* Card 3: Bookshelf */}
+            <button
+              onClick={() => setView('bookshelf')}
+              className="group bg-white rounded-2xl p-6 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border border-gray-100"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">📖</div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-1">我的書架</h3>
+                  <p className="text-gray-500 text-sm">{books.length} 本學習資料</p>
+                </div>
+                <div className="text-gray-300 group-hover:text-gray-400 transition-colors">→</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Demo Section - Light version */}
+        <div className="max-w-3xl mx-auto px-6 pb-16">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-cyan-400">⚡ 免費試用</h2>
+              <h2 className="text-lg font-semibold text-gray-900">⚡ 免費試用</h2>
               {!demoStarted && (
-                <button onClick={startDemo} className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30 transition">
+                <button 
+                  onClick={startDemo} 
+                  className="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition"
+                >
                   點擊試用 Demo
                 </button>
               )}
             </div>
 
             {!demoStarted ? (
-              <p className="text-slate-400 text-sm">
-                粘貼内容太麻煩？直接點擊試用，體驗完整學習流程
+              <p className="text-gray-500 text-sm">
+                粘貼內容太麻煩？直接點擊試用，體驗完整學習流程
               </p>
             ) : (
               <div className="space-y-4">
                 {/* Demo Steps */}
                 <div className="flex gap-2 mb-4">
                   {[0, 1, 2, 3].map(i => (
-                    <div key={i} className={`flex-1 h-1 rounded ${demoStep >= i ? 'bg-cyan-500' : 'bg-slate-700'}`} />
+                    <div key={i} className={`flex-1 h-1 rounded ${demoStep >= i ? 'bg-gray-900' : 'bg-gray-200'}`} />
                   ))}
                 </div>
 
                 {/* Step 0: Input */}
                 {demoStep === 0 && (
                   <div className="space-y-3">
-                    <p className="text-slate-300">預填充了「關鍵路徑法」相關內容，點擊開始學習：</p>
+                    <p className="text-gray-600 text-sm">預填充了「關鍵路徑法」相關內容，點擊開始學習：</p>
                     <textarea
                       value={DEMO_CONTENT.slice(0, 200)}
                       readOnly
-                      className="w-full h-24 p-3 bg-slate-900/50 rounded-lg text-slate-400 text-sm resize-none"
+                      className="w-full h-20 p-3 bg-gray-50 rounded-xl text-gray-500 text-sm resize-none border border-gray-200"
                     />
                     {loading ? (
-                      <div className="flex items-center gap-2 text-cyan-400">
-                        <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                         AI 分析中...
                       </div>
                     ) : (
-                      <button onClick={submitDemoInput} className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium">
+                      <button onClick={submitDemoInput} className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition">
                         🚀 開始學習
                       </button>
                     )}
@@ -365,19 +419,19 @@ export default function Home() {
                 {/* Step 1: Concepts */}
                 {demoStep === 1 && learningGuide && (
                   <div className="space-y-3">
-                    <h3 className="font-bold text-lg">📖 概念拆解</h3>
+                    <h3 className="font-semibold text-gray-900">📖 概念拆解</h3>
                     {learningGuide.chapters.map((ch, i) => (
-                      <div key={ch.id} className="bg-slate-900/50 rounded-lg p-3">
-                        <h4 className="font-medium text-cyan-400">{i + 1}. {ch.chapter}</h4>
-                        <p className="text-sm text-slate-400 mt-1">{ch.summary}</p>
+                      <div key={ch.id} className="bg-gray-50 rounded-xl p-4">
+                        <h4 className="font-medium text-gray-900">{i + 1}. {ch.chapter}</h4>
+                        <p className="text-sm text-gray-500 mt-1">{ch.summary}</p>
                         <div className="flex flex-wrap gap-2 mt-2">
                           {ch.keyPoints.map((kp, j) => (
-                            <span key={j} className="text-xs px-2 py-1 bg-slate-700 rounded">{kp}</span>
+                            <span key={j} className="text-xs px-2 py-1 bg-gray-200 text-gray-600 rounded">{kp}</span>
                           ))}
                         </div>
                       </div>
                     ))}
-                    <button onClick={startDemoQuiz} className="w-full py-3 bg-purple-500 rounded-xl font-medium mt-4">
+                    <button onClick={startDemoQuiz} className="w-full py-3 bg-gray-900 text-white rounded-xl font-medium mt-4 hover:bg-gray-800 transition">
                       📝 開始答題練習
                     </button>
                   </div>
@@ -386,44 +440,44 @@ export default function Home() {
                 {/* Step 2: Quiz */}
                 {demoStep === 2 && (
                   <div className="space-y-3">
-                    <h3 className="font-bold text-lg">📝 測驗</h3>
-                    <div className="bg-slate-900/50 rounded-lg p-4">
-                      <p className="font-medium mb-3">關鍵路徑是指什麼？</p>
+                    <h3 className="font-semibold text-gray-900">📝 測驗</h3>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="font-medium text-gray-900 mb-3">關鍵路徑是指什麼？</p>
                       {['項目中最長的活動序列', '最短的活動序列', '任意一條路徑', '成本最低的路徑'].map((opt, i) => {
                         const answered = quizAnswers.length > 0;
                         const isSelected = quizAnswers[0]?.selected === i;
                         const isCorrect = i === 0;
-                        let bgClass = 'bg-slate-700 hover:bg-slate-600';
+                        let bgClass = 'bg-white border border-gray-200 hover:border-gray-300';
                         if (answered) {
-                          if (isCorrect) bgClass = 'bg-green-500/30 border border-green-500';
-                          else if (isSelected) bgClass = 'bg-red-500/30 border border-red-500';
+                          if (isCorrect) bgClass = 'bg-green-50 border border-green-300';
+                          else if (isSelected) bgClass = 'bg-red-50 border border-red-300';
                         }
                         return (
                           <button
                             key={i}
                             onClick={() => !answered && submitQuizAnswer(i)}
                             disabled={answered}
-                            className={`w-full p-3 rounded-lg text-left mb-2 transition ${bgClass} ${answered ? '' : 'cursor-pointer'}`}
+                            className={`w-full p-3 rounded-lg text-left mb-2 transition ${bgClass}`}
                           >
-                            {String.fromCharCode(65 + i)}. {opt}
-                            {answered && isCorrect && <span className="float-right text-green-400">✓</span>}
-                            {answered && isSelected && !isCorrect && <span className="float-right text-red-400">✗</span>}
+                            <span className="text-gray-700">{String.fromCharCode(65 + i)}. {opt}</span>
+                            {answered && isCorrect && <span className="float-right text-green-500">✓</span>}
+                            {answered && isSelected && !isCorrect && <span className="float-right text-red-500">✗</span>}
                           </button>
                         );
                       })}
                     </div>
                     
                     {quizFeedback && (
-                      <div className={`p-4 rounded-lg ${quizFeedback.correct ? 'bg-green-500/20 border border-green-500/30' : 'bg-blue-500/20 border border-blue-500/30'}`}>
-                        <p className="text-sm">{quizFeedback.explanation}</p>
+                      <div className={`p-4 rounded-xl ${quizFeedback.correct ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
+                        <p className="text-sm text-gray-700">{quizFeedback.explanation}</p>
                         {!quizFeedback.correct && quizFeedback.hint && (
-                          <p className="text-sm text-cyan-400 mt-2">💡 {quizFeedback.hint}</p>
+                          <p className="text-sm text-blue-600 mt-2">💡 {quizFeedback.hint}</p>
                         )}
                       </div>
                     )}
 
                     {quizAnswers.length > 0 && (
-                      <button onClick={finishDemo} className="w-full py-3 bg-slate-700 rounded-xl mt-4">
+                      <button onClick={finishDemo} className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl mt-4 hover:bg-gray-200 transition">
                         {quizAnswers[0].correct ? '🎉 完成 Demo' : '🔄 重新嘗試'}
                       </button>
                     )}
@@ -432,29 +486,11 @@ export default function Home() {
               </div>
             )}
           </div>
-
-          {/* Main Actions */}
-          <div className="grid md:grid-cols-3 gap-4">
-            <button onClick={() => setView('topic')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
-              <div className="text-3xl mb-3">🔍</div>
-              <h3 className="font-bold mb-1">智能搜索</h3>
-              <p className="text-slate-400 text-sm">輸入主題，AI 搜集資料</p>
-            </button>
-            <button onClick={() => setView('learning')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
-              <div className="text-3xl mb-3">📄</div>
-              <h3 className="font-bold mb-1">PDF 學習</h3>
-              <p className="text-slate-400 text-sm">上傳教材，粘貼內容</p>
-            </button>
-            <button onClick={() => setView('bookshelf')} className="bg-slate-800/50 rounded-xl p-6 text-left hover:bg-slate-800/70 border border-slate-700 transition">
-              <div className="text-3xl mb-3">📖</div>
-              <h3 className="font-bold mb-1">我的書架</h3>
-              <p className="text-slate-400 text-sm">{books.length} 本學習資料</p>
-            </button>
-          </div>
         </div>
       </div>
     );
   }
+
 
   // Topic Search View
   if (view === 'topic') {
